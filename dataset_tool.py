@@ -18,6 +18,8 @@ import numpy as np
 import tensorflow as tf
 import PIL.Image
 import dnnlib.tflib as tflib
+import json
+from tqdm import tqdm
 
 from training import dataset
 
@@ -499,31 +501,79 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 
 #----------------------------------------------------------------------------
 
-def create_from_images(tfrecord_dir, image_dir, shuffle):
+# def create_from_images(tfrecord_dir, image_dir, shuffle):
+#     print('Loading images from "%s"' % image_dir)
+#     image_filenames = sorted(glob.glob(os.path.join(image_dir, '*')))
+#     if len(image_filenames) == 0:
+#         error('No input images found')
+#
+#     img = np.asarray(PIL.Image.open(image_filenames[0]))
+#     resolution = img.shape[0]
+#     channels = img.shape[2] if img.ndim == 3 else 1
+#     if img.shape[1] != resolution:
+#         error('Input images must have the same width and height')
+#     if resolution != 2 ** int(np.floor(np.log2(resolution))):
+#         error('Input image resolution must be a power-of-two')
+#     if channels not in [1, 3]:
+#         error('Input images must be stored as RGB or grayscale')
+#
+#     with TFRecordExporter(tfrecord_dir, len(image_filenames)) as tfr:
+#         order = tfr.choose_shuffled_order() if shuffle else np.arange(len(image_filenames))
+#         for idx in range(order.size):
+#             img = np.asarray(PIL.Image.open(image_filenames[order[idx]]))
+#             if channels == 1:
+#                 img = img[np.newaxis, :, :] # HW => CHW
+#             else:
+#                 img = img.transpose([2, 0, 1]) # HWC => CHW
+#             tfr.add_image(img)
+
+#----------------------------------------------------------------------------
+
+
+def create_from_images(tfrecord_dir='./datasets/cars', image_dir='E:/carswithcolors/images_with_labels_filter_ratio_warning', shuffle=False, width=512, height=320):
     print('Loading images from "%s"' % image_dir)
     image_filenames = sorted(glob.glob(os.path.join(image_dir, '*')))
     if len(image_filenames) == 0:
         error('No input images found')
 
     img = np.asarray(PIL.Image.open(image_filenames[0]))
-    resolution = img.shape[0]
-    channels = img.shape[2] if img.ndim == 3 else 1
-    if img.shape[1] != resolution:
-        error('Input images must have the same width and height')
-    if resolution != 2 ** int(np.floor(np.log2(resolution))):
-        error('Input image resolution must be a power-of-two')
-    if channels not in [1, 3]:
-        error('Input images must be stored as RGB or grayscale')
+    channels = img.shape[2]
+    if channels != 3:
+        error('Input images must be stored as RGB')
+
+    with open('E:/carswithcolors/trainA/data.json') as json_file:
+        data = json.load(json_file)
+    colors = data['labels'][1]['classes']
 
     with TFRecordExporter(tfrecord_dir, len(image_filenames)) as tfr:
-        order = tfr.choose_shuffled_order() if shuffle else np.arange(len(image_filenames))
-        for idx in range(order.size):
-            img = np.asarray(PIL.Image.open(image_filenames[order[idx]]))
-            if channels == 1:
-                img = img[np.newaxis, :, :] # HW => CHW
-            else:
-                img = img.transpose([2, 0, 1]) # HWC => CHW
-            tfr.add_image(img)
+        label_index = 0
+        labels = []
+        # np.zeros((int(len(image_filenames) / 2), len(colors)), dtype=np.float32)
+        for idx in tqdm(range(0, len(image_filenames), 2)):
+            img = PIL.Image.open(image_filenames[idx])
+            onehot = np.zeros(len(colors), dtype=np.float32)
+            with open(image_filenames[idx] + '.json') as json_file:
+                car_data = json.load(json_file)
+            onehot[car_data['labels']['color']] = 1.0
+            img = img.resize((width, height), PIL.Image.ANTIALIAS)
+            img = np.asarray(img)
+            if len(img.shape) is not 3:
+                print('grey')
+                print(image_filenames[idx])
+                print()
+                continue
+            if img.shape[2] is not 3:
+                print(img.shape[2])
+                print(image_filenames[idx])
+                print()
+                continue
+            img = img.transpose([2, 0, 1]) # HWC => CHW
+
+            canvas = np.zeros([3, width, width], dtype=np.uint8)
+            canvas[:, (width - height) // 2: (width + height) // 2] = img
+            tfr.add_image(canvas)
+            labels.append(onehot)
+        tfr.add_labels(np.asarray(labels))
 
 #----------------------------------------------------------------------------
 
