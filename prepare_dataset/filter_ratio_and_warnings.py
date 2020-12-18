@@ -4,8 +4,8 @@ import os
 from PIL import Image
 import warnings
 
-src_folder = 'E:/carswithcolors/images_with_labels'
-dest_folder = 'E:/carswithcolors/images_with_labels_filter_ratio_warning'
+src_folder = '../../modified_datasets/cars_flat'
+dest_folder = '../../modified_datasets/cars_flat_ratio_warnings'
 
 if not os.path.exists(dest_folder):
     os.makedirs(dest_folder)
@@ -15,7 +15,7 @@ num_removed = 0
 num_corrupt_EXIF = 0
 
 for file in tqdm(os.listdir(src_folder)):
-    if file.endswith(".jpg"):
+    if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
         src_img = src_folder + '/' + file
         dest_img = dest_folder + '/' + file
 
@@ -32,7 +32,8 @@ for file in tqdm(os.listdir(src_folder)):
                     num_removed += 1
                     continue
                 shutil.copyfile(src_img, dest_img)
-                shutil.copyfile(src_label, dest_label)
+                if os.path.exists(src_label):
+                    shutil.copyfile(src_label, dest_label)
                 num_kept += 1
             except:
                 print('removed invalid format')

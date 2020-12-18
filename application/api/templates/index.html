@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Car Factory</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	<script>
+		window.onload = () => {
+			$('#sendbutton').click(() => {
+				imagebox = $('#imagebox')
+				manufacturer = document.getElementById("manufacturer").value
+				model = document.getElementById("model").value
+				color = document.getElementById("color").value
+				seed = document.getElementById("seed").value
+				sendData = [manufacturer, model, color, seed]
+				$.ajax({
+					url: "http://localhost:5000/image",
+					type:"POST",
+					data: sendData,
+					error: function(data, textStatus, errorThrown){
+						console.log("upload error" , data);
+						console.log("status", textStatus)
+						console.log("errorThrown", errorThrown)
+						console.log(data.getAllResponseHeaders());
+					},
+					success: function(data){
+						bytestring = data['status']
+						image = bytestring.split('\'')[1]
+						imagebox.attr('src' , 'data:image/jpeg;base64,'+image)
+					}
+				});
+			});
+		};
+	</script>
+</head>
+<body>
+
+<div class="box" style="margin:20px;">
+
+	<form>
+		  <label>Manufacturer:
+				<select id="manufacturer">
+					<option value="0">audi</option>
+					<option value="1">bmw</option>
+					<option value="2">cadillac</option>
+					<option value="3">dacia</option>
+					<option value="4">dodge</option>
+					<option value="5">ferrari</option>
+					<option value="6">fiat</option>
+					<option value="7">goggomobil</option>
+					<option value="8">honda</option>
+					<option value="9">hyundai</option>
+					<option value="10">lada</option>
+					<option value="11">mazda</option>
+					<option value="12">mercedes</option>
+					<option value="13">opel</option>
+					<option value="14">porsche</option>
+					<option value="15">subaru</option>
+					<option value="16">tata</option>
+					<option value="17">vw</option>
+				</select>
+		  </label>
+	</form>
+
+	<form>
+		  <label>Model:
+				<select id="model">
+					<option value="0">audi a1</option>
+					<option value="1">audi a3</option>
+					<option value="2">audi a4</option>
+					<option value="3">audi a5</option>
+					<option value="4">audi a6</option>
+					<option value="5">audi a7</option>
+					<option value="6">audi a8</option>
+					<option value="7">bmw 1 series</option>
+					<option value="8">bmw 2 series</option>
+					<option value="9">bmw 3 series</option>
+					<option value="10">bmw 4 series</option>
+					<option value="11">bmw 5 series</option>
+					<option value="12">bmw 6 series</option>
+					<option value="13">bmw 7 series</option>
+					<option value="14">bmw i3</option>
+					<option value="15">bmw i8</option>
+					<option value="16">cadillac escalade</option>
+					<option value="17">dacia duster</option>
+					<option value="18">dacia logan</option>
+					<option value="19">dacia sandero</option>
+					<option value="20">dodge challenger srt</option>
+					<option value="21">dodge charger srt</option>
+					<option value="22">dodge ram</option>
+					<option value="23">ferrari california</option>
+					<option value="24">ferrari enzo</option>
+					<option value="25">ferrari la ferrari</option>
+					<option value="26">fiat cinquecento</option>
+					<option value="27">fiat multipla</option>
+					<option value="28">fiat panda</option>
+					<option value="29">fiat spider</option>
+					<option value="30">goggomobil ts250</option>
+					<option value="31">honda civic</option>
+					<option value="32">honda jazz</option>
+					<option value="33">honda nsx</option>
+					<option value="34">hyundai tucson</option>
+					<option value="35">lada niva</option>
+					<option value="36">mazda 3</option>
+					<option value="37">mazda cx5</option>
+					<option value="38">mazda miata</option>
+					<option value="39">mazda rx8</option>
+					<option value="40">mazda5</option>
+					<option value="41">mercedes a-class</option>
+					<option value="42">mercedes b-class</option>
+					<option value="43">mercedes c-class</option>
+					<option value="44">mercedes e-class</option>
+					<option value="45">mercedes g-class</option>
+					<option value="46">mercedes m-class</option>
+					<option value="47">mercedes s-class</option>
+					<option value="48">mercedes sls amg</option>
+					<option value="49">opel adam</option>
+					<option value="50">opel admiral</option>
+					<option value="51">opel astra</option>
+					<option value="52">opel corsa</option>
+					<option value="53">opel grandland x</option>
+					<option value="54">opel insignia</option>
+					<option value="55">opel combo</option>
+					<option value="56">porsche 911 gt3</option>
+					<option value="57">porsche 944</option>
+					<option value="58">porsche cayenne</option>
+					<option value="59">porsche panamera</option>
+					<option value="60">subaru impreza</option>
+					<option value="61">tata nano</option>
+					<option value="62">vw golf 7</option>
+					<option value="63">vw jetta</option>
+					<option value="64">vw passat</option>
+					<option value="65">vw tiguan</option>
+					<option value="66">vw tuareg</option>
+				</select>
+		  </label>
+	</form>
+
+	<form>
+		  <label>Color:
+				<select id="color">
+					<option value="0">white</option>
+					<option value="1">silver</option>
+					<option value="2">gray</option>
+					<option value="3">black</option>
+					<option value="4">blue</option>
+					<option value="5">red</option>
+					<option value="6">brown</option>
+					<option value="7">green</option>
+					<option value="8">yellow</option>
+					<option value="9">orange</option>
+					<option value="10">purple</option>
+					<option value="11">undefined</option>
+				</select>
+		  </label>
+	</form>
+	<form>
+		<label for="seed">Seed (-1 for random seed):</label>
+		<input type="text" id="seed" name="seed" value="-1">
+	</form>
+
+	<button name="send" id="sendbutton">Generate</button>
+
+	<br><br>
+	<img id="imagebox" alt="" src="">
+
+</div>
+
+</body>
+</html>
+

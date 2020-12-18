@@ -20,6 +20,8 @@ import PIL.Image
 import dnnlib.tflib as tflib
 import json
 from tqdm import tqdm
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 from training import dataset
 
@@ -530,50 +532,74 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 #----------------------------------------------------------------------------
 
 
-def create_from_images(tfrecord_dir='./datasets/cars', image_dir='E:/carswithcolors/images_with_labels_filter_ratio_warning', shuffle=False, width=512, height=320):
-    print('Loading images from "%s"' % image_dir)
-    image_filenames = sorted(glob.glob(os.path.join(image_dir, '*')))
-    if len(image_filenames) == 0:
-        error('No input images found')
+# def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir='../modified_datasets/cars_flat_ratio_warnings', shuffle=False, width=512, height=320):
+#     with open('../dataset/cars/data.json') as json_file:
+#         data = json.load(json_file)
+#     car_models = data['labels'][0]['classes']
+#     colors = data['labels'][1]['classes']
+#     manufacturers = data['labels'][3]['classes']
+#
+#     print('counting images')
+#     num_images = 0
+#     for file in os.listdir(image_dir):
+#         if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
+#             num_images += 1
+#
+#     with TFRecordExporter(tfrecord_dir, num_images) as tfr:
+#         labels = []
+#         for file in tqdm(os.listdir(image_dir)):
+#             file = image_dir + '/' + file
+#             if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
+#                 img = PIL.Image.open(file)
+#                 onehot = np.zeros(len(car_models) + len(colors) + len(manufacturers), dtype=np.float32)
+#                 if os.path.exists(file + '.json'):
+#                     with open(file + '.json') as json_file:
+#                         car_data = json.load(json_file)
+#                     if 'model' in car_data['labels']:
+#                         onehot[car_data['labels']['model']] = 1.0
+#                     if 'color' in car_data['labels']:
+#                         onehot[car_data['labels']['color'] + len(car_models)] = 1.0
+#                     if 'manufacturer' in car_data['labels']:
+#                         onehot[car_data['labels']['manufacturer'] + len(car_models) + len(colors)] = 1.0
+#                 else:
+#                     continue
+#
+#                 img = img.resize((width, height), PIL.Image.ANTIALIAS)
+#                 img = np.asarray(img)
+#                 if len(img.shape) is not 3:
+#                     continue
+#                 if img.shape[2] is not 3:
+#                     continue
+#
+#                 img = img.transpose([2, 0, 1]) # HWC => CHW
+#                 canvas = np.zeros([3, width, width], dtype=np.uint8)
+#                 canvas[:, (width - height) // 2: (width + height) // 2] = img
+#                 tfr.add_image(canvas)
+#                 labels.append(onehot)
+#         tfr.add_labels(np.asarray(labels))
+#
 
-    img = np.asarray(PIL.Image.open(image_filenames[0]))
-    channels = img.shape[2]
-    if channels != 3:
-        error('Input images must be stored as RGB')
+def create_from_images(tfrecord_dir='./datasets/abstract_art_512', image_dir='E:abstract_art_512', shuffle=False, width=512, height=320):
 
-    with open('E:/carswithcolors/trainA/data.json') as json_file:
-        data = json.load(json_file)
-    colors = data['labels'][1]['classes']
+    print('counting images')
+    num_images = 0
+    for file in os.listdir(image_dir):
+        if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
+            num_images += 1
 
-    with TFRecordExporter(tfrecord_dir, len(image_filenames)) as tfr:
-        label_index = 0
-        labels = []
-        # np.zeros((int(len(image_filenames) / 2), len(colors)), dtype=np.float32)
-        for idx in tqdm(range(0, len(image_filenames), 2)):
-            img = PIL.Image.open(image_filenames[idx])
-            onehot = np.zeros(len(colors), dtype=np.float32)
-            with open(image_filenames[idx] + '.json') as json_file:
-                car_data = json.load(json_file)
-            onehot[car_data['labels']['color']] = 1.0
-            img = img.resize((width, height), PIL.Image.ANTIALIAS)
-            img = np.asarray(img)
-            if len(img.shape) is not 3:
-                print('grey')
-                print(image_filenames[idx])
-                print()
-                continue
-            if img.shape[2] is not 3:
-                print(img.shape[2])
-                print(image_filenames[idx])
-                print()
-                continue
-            img = img.transpose([2, 0, 1]) # HWC => CHW
+    with TFRecordExporter(tfrecord_dir, num_images) as tfr:
+        for file in tqdm(os.listdir(image_dir)):
+            file = image_dir + '/' + file
+            if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
+                img = PIL.Image.open(file)
+                img = np.asarray(img)
+                if len(img.shape) is not 3:
+                    continue
+                if img.shape[2] is not 3:
+                    continue
+                img = img.transpose([2, 0, 1]) # HWC => CHW
+                tfr.add_image(img)
 
-            canvas = np.zeros([3, width, width], dtype=np.uint8)
-            canvas[:, (width - height) // 2: (width + height) // 2] = img
-            tfr.add_image(canvas)
-            labels.append(onehot)
-        tfr.add_labels(np.asarray(labels))
 
 #----------------------------------------------------------------------------
 
