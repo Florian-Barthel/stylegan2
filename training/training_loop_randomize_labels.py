@@ -40,7 +40,17 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
         x = tf.reshape(x, [-1, s[1], s[2], 1, s[3], 1])
         x = tf.tile(x, [1, 1, 1, factor, 1, factor])
         x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
-    return x, labels
+    with tf.name_scope('RandomizeLabels'):
+        keep_probability = 0.75
+        labels_bool = tf.cast(labels, tf.bool)
+        mask = tf.random.uniform(tf.shape(labels), 0.0, 1.0) > (1 - keep_probability)
+        label_remove = tf.cast(tf.math.logical_and(labels_bool, mask), dtype=tf.float32)
+
+        multiply_interval = (0.7, 1.3)
+        random_multiplier = tf.random.uniform(tf.shape(labels), multiply_interval[0], multiply_interval[1])
+        labels_multiply = label_remove * random_multiplier
+        labels_multiply = tf.concat([labels[:, :1], labels_multiply[:, 1:]], axis=-1)
+    return x, labels_multiply
 
 #----------------------------------------------------------------------------
 # Evaluate time-varying training parameters.
@@ -203,7 +213,7 @@ def training_loop(
             with tf.name_scope('DataFetch'):
                 sched = training_schedule(cur_nimg=int(resume_kimg*1000), training_set=training_set, **sched_args)
                 reals_var = tf.Variable(name='reals', trainable=False, initial_value=tf.zeros([sched.minibatch_gpu] + training_set.shape))
-                labels_var = tf.Variable(name='labels', trainable=False, initial_value=tf.zeros([sched.minibatch_gpu, training_set.label_size]))
+                labels_var = tf.Variable(name='labels', trainable=False, initial_value=tf.zeros([sched.minibatch_gpu, 1 + training_set.label_size]))
                 reals_write, labels_write = training_set.get_minibatch_tf()
                 reals_write, labels_write = process_reals(reals_write, labels_write, lod_in, mirror_augment, training_set.dynamic_range, drange_net)
                 reals_write = tf.concat([reals_write, reals_var[minibatch_gpu_in:]], axis=0)

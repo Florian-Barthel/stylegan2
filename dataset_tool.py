@@ -76,9 +76,9 @@ class TFRecordExporter:
             assert self.shape[1] == self.shape[2]
             assert self.shape[1] == 2**self.resolution_log2
             tfr_opt = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.NONE)
-            for lod in range(self.resolution_log2 - 1):
-                tfr_file = self.tfr_prefix + '-r%02d.tfrecords' % (self.resolution_log2 - lod)
-                self.tfr_writers.append(tf.python_io.TFRecordWriter(tfr_file, tfr_opt))
+            # for lod in range(self.resolution_log2 - 1):
+            tfr_file = self.tfr_prefix + '-r%02d.tfrecords' % (self.resolution_log2) #tfr_file = self.tfr_prefix + '-r%02d.tfrecords' % (self.resolution_log2 - lod)
+            self.tfr_writers.append(tf.python_io.TFRecordWriter(tfr_file, tfr_opt))
         assert img.shape == self.shape
         for lod, tfr_writer in enumerate(self.tfr_writers):
             if lod:
@@ -532,12 +532,84 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 #----------------------------------------------------------------------------
 
 
-# def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir='../modified_datasets/cars_flat_ratio_warnings', shuffle=False, width=512, height=320):
-#     with open('../dataset/cars/data.json') as json_file:
-#         data = json.load(json_file)
-#     car_models = data['labels'][0]['classes']
-#     colors = data['labels'][1]['classes']
-#     manufacturers = data['labels'][3]['classes']
+def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir='../modified_datasets/cars_flat_ratio_warnings', shuffle=False, width=512, height=512):
+
+    label_dir = 'C:/Users/Florian/Desktop/cars/labels_body-80_crop-multiple_update-orientation_update-body'
+
+    with open('C:/Users/Florian/Desktop/cars/data.json') as json_file:
+        data = json.load(json_file)
+    car_models = data['labels'][0]['classes']
+    colors = data['labels'][1]['classes']
+    manufacturers = data['labels'][2]['classes']
+    bodies = data['labels'][3]['classes']
+    rotations = data['labels'][4]['classes']
+    ratios = data['labels'][5]['classes']
+
+    print('counting images')
+    num_images = 0
+    for file in os.listdir(image_dir):
+        if file.lower().endswith(".jpg"):
+            num_images += 1
+
+    with TFRecordExporter(tfrecord_dir, num_images) as tfr:
+        labels = []
+        for file in tqdm(sorted(os.listdir(image_dir))):
+            img_file = image_dir + '/' + file
+            label_file = label_dir + '/' + file + '.json'
+
+            img = PIL.Image.open(img_file)
+            label_size = 1 + len(car_models) + len(colors) + len(manufacturers) + len(bodies) + len(rotations) + len(ratios)
+            onehot = np.zeros(label_size, dtype=np.float32)
+
+            with open(label_file) as json_file:
+                car_data = json.load(json_file)
+
+            onehot[0] = 1.0
+            offset = 1
+
+            if 'model' in car_data['labels']:
+                onehot[car_data['labels']['model'] + offset] = 1.0
+            offset += len(car_models)
+
+            if 'color' in car_data['labels']:
+                onehot[car_data['labels']['color'] + offset] = 1.0
+            offset += len(colors)
+
+            if 'manufacturer' in car_data['labels']:
+                onehot[car_data['labels']['manufacturer'] + offset] = 1.0
+            offset += len(manufacturers)
+
+            if 'body' in car_data['labels']:
+                onehot[car_data['labels']['body'] + offset] = 1.0
+            offset += len(bodies)
+
+            if 'rotation' in car_data['labels']:
+                onehot[car_data['labels']['rotation'] + offset] = 1.0
+            offset += len(rotations)
+
+            if 'ratio' in car_data['labels']:
+                onehot[car_data['labels']['ratio'] + offset] = 1.0
+
+            img = img.resize((width, height), PIL.Image.ANTIALIAS)
+            img = np.asarray(img)
+            if len(img.shape) is not 3:
+                print(img_file)
+                print('len(img.shape) is not 3')
+                continue
+            if img.shape[2] is not 3:
+                print(img_file)
+                print('img.shape[2] is not 3')
+                continue
+
+            img = img.transpose([2, 0, 1]) # HWC => CHW
+            # canvas = np.zeros([3, width, width], dtype=np.uint8)
+            # canvas[:, (width - height) // 2: (width + height) // 2] = img
+            tfr.add_image(img)
+            labels.append(onehot)
+        tfr.add_labels(np.asarray(labels))
+
+
+# def create_from_images(tfrecord_dir='./datasets/abstract_art_512', image_dir='E:abstract_art_512', shuffle=False, width=512, height=320):
 #
 #     print('counting images')
 #     num_images = 0
@@ -546,59 +618,17 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 #             num_images += 1
 #
 #     with TFRecordExporter(tfrecord_dir, num_images) as tfr:
-#         labels = []
 #         for file in tqdm(os.listdir(image_dir)):
 #             file = image_dir + '/' + file
 #             if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
 #                 img = PIL.Image.open(file)
-#                 onehot = np.zeros(len(car_models) + len(colors) + len(manufacturers), dtype=np.float32)
-#                 if os.path.exists(file + '.json'):
-#                     with open(file + '.json') as json_file:
-#                         car_data = json.load(json_file)
-#                     if 'model' in car_data['labels']:
-#                         onehot[car_data['labels']['model']] = 1.0
-#                     if 'color' in car_data['labels']:
-#                         onehot[car_data['labels']['color'] + len(car_models)] = 1.0
-#                     if 'manufacturer' in car_data['labels']:
-#                         onehot[car_data['labels']['manufacturer'] + len(car_models) + len(colors)] = 1.0
-#                 else:
-#                     continue
-#
-#                 img = img.resize((width, height), PIL.Image.ANTIALIAS)
 #                 img = np.asarray(img)
 #                 if len(img.shape) is not 3:
 #                     continue
 #                 if img.shape[2] is not 3:
 #                     continue
-#
 #                 img = img.transpose([2, 0, 1]) # HWC => CHW
-#                 canvas = np.zeros([3, width, width], dtype=np.uint8)
-#                 canvas[:, (width - height) // 2: (width + height) // 2] = img
-#                 tfr.add_image(canvas)
-#                 labels.append(onehot)
-#         tfr.add_labels(np.asarray(labels))
-#
-
-def create_from_images(tfrecord_dir='./datasets/abstract_art_512', image_dir='E:abstract_art_512', shuffle=False, width=512, height=320):
-
-    print('counting images')
-    num_images = 0
-    for file in os.listdir(image_dir):
-        if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
-            num_images += 1
-
-    with TFRecordExporter(tfrecord_dir, num_images) as tfr:
-        for file in tqdm(os.listdir(image_dir)):
-            file = image_dir + '/' + file
-            if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") or file.lower().endswith(".png"):
-                img = PIL.Image.open(file)
-                img = np.asarray(img)
-                if len(img.shape) is not 3:
-                    continue
-                if img.shape[2] is not 3:
-                    continue
-                img = img.transpose([2, 0, 1]) # HWC => CHW
-                tfr.add_image(img)
+#                 tfr.add_image(img)
 
 
 #----------------------------------------------------------------------------
