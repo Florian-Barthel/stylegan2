@@ -41,7 +41,7 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
         x = tf.tile(x, [1, 1, 1, factor, 1, factor])
         x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
     with tf.name_scope('RandomizeLabels'):
-        keep_probability = 0.75
+        keep_probability = 0.90
         labels_bool = tf.cast(labels, tf.bool)
         mask = tf.random.uniform(tf.shape(labels), 0.0, 1.0) > (1 - keep_probability)
         label_remove = tf.cast(tf.math.logical_and(labels_bool, mask), dtype=tf.float32)
