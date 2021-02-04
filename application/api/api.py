@@ -18,10 +18,10 @@ CORS(app)
 session = tflib.create_session(None, force_as_default=True)
 
 latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
-label_placeholder = tf.placeholder(tf.float32, shape=(None, 120))
+label_placeholder = tf.placeholder(tf.float32, shape=(None, 121))
 
 
-_G, _D, Gs = misc.load_pkl('../../results/00030-stylegan2-cars_v1_512-2gpu-config-f/network-snapshot-003369.pkl')
+_G, _D, Gs = misc.load_pkl('../../results/00032-stylegan2-cars_v2_512-2gpu-config-f/network-snapshot-001564.pkl')
 gen_image = Gs.get_output_for(latent_placeholder, label_placeholder, is_validation=True, randomize_noise=True,
                           truncation_psi_val=1.0)
 
@@ -54,18 +54,19 @@ def image():
     ratio = int(payload['ratio'])
     seed = int(payload['seed'])
 
-    onehot = np.zeros((1, 120), dtype=np.float)
+    onehot = np.zeros((1, 121), dtype=np.float)
+    onehot[0, 0] = 1
     if model >= 0:
-        onehot[0, model] = 1.0
+        onehot[0, 1 + model] = 1.0
     if color >= 0:
-        onehot[0, color + 67] = 1.0
+        onehot[0, 1 + 67 + color] = 1.0
     if manufacturer >= 0:
-        onehot[0, 67 + 12 + manufacturer] = 1.0
+        onehot[0, 1 + 67 + 12 + manufacturer] = 1.0
     if body >= 0:
-        onehot[0, 67 + 12 + 18 + body] = 1.0
+        onehot[0, 1 + 67 + 12 + 18 + body] = 1.0
     if rotation >= 0:
-        onehot[0, 67 + 12 + 18 + 10 + rotation] = 1.0
-    onehot[0, 67 + 12 + 18 + 10 + 8 + ratio] = 1.0
+        onehot[0, 1 + 67 + 12 + 18 + 10 + rotation] = 1.0
+    onehot[0, 1 + 67 + 12 + 18 + 10 + 8 + ratio] = 1.0
 
     # print(onehot)
     image = run(onehot, seed)
