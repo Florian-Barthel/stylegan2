@@ -1,84 +1,88 @@
 from flask import Flask, render_template, request, jsonify
-from PIL import Image
 import io, sys
 import numpy as np
 import base64
-sys.path.append("../../")
-CUDA_VISIBLE_DEVICES = ""
-
-import dnnlib.tflib as tflib
-import training.misc as misc
+import application.api.generate as generate
 from flask_cors import CORS
-import tensorflow as tf
 
+sys.path.append("../../")
 
 app = Flask(__name__)
 CORS(app)
-
-session = tflib.create_session(None, force_as_default=True)
-
-latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
-label_placeholder = tf.placeholder(tf.float32, shape=(None, 121))
-
-
-_G, _D, Gs = misc.load_pkl('../../results/00032-stylegan2-cars_v2_512-2gpu-config-f/network-snapshot-001564.pkl')
-gen_image = Gs.get_output_for(latent_placeholder, label_placeholder, is_validation=True, randomize_noise=True,
-                          truncation_psi_val=1.0)
-
-
-def run(label, seed):
-    if seed is -1:
-        latent = np.random.normal(0, 1, [1, Gs.input_shape[1]]).astype(np.float32)
-    else:
-        latent = np.random.RandomState(seed).normal(0, 1, [1, Gs.input_shape[1]]).astype(np.float32)
-
-    with tf.device('/cpu:0'):
-        image = session.run(gen_image, feed_dict={latent_placeholder: latent, label_placeholder: label})[0]
-        image = np.transpose(image, [1, 2, 0])
-        image = image * 127.5 + 127.5
-        image = np.clip(image, 0, 255).astype(np.uint8)
-        return image
 
 
 @app.route('/image', methods=['GET', 'POST'])
 def image():
     data = request.get_json()
-    # print(data)
     payload = data['payload']
-    print(payload)
     manufacturer = int(payload['manufacturer'])
     model = int(payload['model'])
     color = int(payload['color'])
     body = int(payload['body'])
     rotation = int(payload['rotation'])
     ratio = int(payload['ratio'])
+    background = int(payload['background'])
+    randomize_seed = payload['randomize_seed']
     seed = int(payload['seed'])
+    size = int(payload['size'])
 
-    onehot = np.zeros((1, 121), dtype=np.float)
-    onehot[0, 0] = 1
-    if model >= 0:
-        onehot[0, 1 + model] = 1.0
-    if color >= 0:
-        onehot[0, 1 + 67 + color] = 1.0
-    if manufacturer >= 0:
-        onehot[0, 1 + 67 + 12 + manufacturer] = 1.0
-    if body >= 0:
-        onehot[0, 1 + 67 + 12 + 18 + body] = 1.0
-    if rotation >= 0:
-        onehot[0, 1 + 67 + 12 + 18 + 10 + rotation] = 1.0
-    onehot[0, 1 + 67 + 12 + 18 + 10 + 8 + ratio] = 1.0
+    label = generate.label_vector(model=model,
+                                  color=color,
+                                  manufacturer=manufacturer,
+                                  body=body,
+                                  rotation=rotation,
+                                  ratio=ratio,
+                                  background=background)
 
-    # print(onehot)
-    image = run(onehot, seed)
-    # img = image[48:-48,:]
-    img = Image.fromarray(image)
-    img = img.resize((512, 512))
-
+    if randomize_seed:
+        seed = int(np.random.uniform() * (2 ** 32 - 1))
+    image = generate.single_image(label, seed, size)
     rawBytes = io.BytesIO()
-    img.save(rawBytes, "JPEG")
+    image.save(rawBytes, "JPEG")
     rawBytes.seek(0)
     img_base64 = base64.b64encode(rawBytes.read())
-    return jsonify({'status': str(img_base64)})
+    return jsonify({'status': str(img_base64), 'seed': seed})
+
+
+@app.route('/load_interpolations', methods=['POST'])
+def load_interpolations():
+    data = request.get_json()
+    payload = data['payload']
+    manufacturer_left = int(payload['manufacturer_left'])
+    model_left = int(payload['model_left'])
+    color_left = int(payload['color_left'])
+    body_left = int(payload['body_left'])
+    rotation_left = int(payload['rotation_left'])
+    ratio_left = int(payload['ratio_left'])
+    background_left = int(payload['background_left'])
+    seed_left = int(payload['seed_left'])
+
+    label_left = generate.label_vector(model=model_left,
+                                       color=color_left,
+                                       manufacturer=manufacturer_left,
+                                       body=body_left,
+                                       rotation=rotation_left,
+                                       ratio=ratio_left,
+                                       background=background_left)
+
+    manufacturer_right = int(payload['manufacturer_right'])
+    model_right = int(payload['model_right'])
+    color_right = int(payload['color_right'])
+    body_right = int(payload['body_right'])
+    rotation_right = int(payload['rotation_right'])
+    ratio_right = int(payload['ratio_right'])
+    background_right = int(payload['background_right'])
+    seed_right = int(payload['seed_right'])
+
+    label_right = generate.label_vector(model=model_right,
+                                        color=color_right,
+                                        manufacturer=manufacturer_right,
+                                        body=body_right,
+                                        rotation=rotation_right,
+                                        ratio=ratio_right,
+                                        background=background_right)
+
+    return generate.interpolations(label_left, seed_left, label_right, seed_right)
 
 
 @app.route('/')
@@ -86,9 +90,13 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/interpolate')
+def interpolate():
+    return render_template('interpolate.html')
+
+
 @app.after_request
 def after_request(response):
-    # print("log: setting cors", file=sys.stderr)
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE')
@@ -96,5 +104,5 @@ def after_request(response):
 
 
 if __name__ == '__main__':
-    #app.run(debug=False)
-    app.run(host='0.0.0.0', debug=False)
+    app.run(debug=False)
+    # app.run(host='0.0.0.0', debug=False)

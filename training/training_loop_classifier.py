@@ -41,17 +41,16 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
         x = tf.tile(x, [1, 1, 1, factor, 1, factor])
         x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
     with tf.name_scope('RandomizeLabels'):
-        keep_probability = 0.80
+        keep_probability = 0.90
         labels_bool = tf.cast(labels, tf.bool)
         mask = tf.random.uniform(tf.shape(labels), 0.0, 1.0) > (1 - keep_probability)
         label_remove = tf.cast(tf.math.logical_and(labels_bool, mask), dtype=tf.float32)
 
-        # multiply_interval = (0.7, 1.3)
-        # random_multiplier = tf.random.uniform(tf.shape(labels), multiply_interval[0], multiply_interval[1])
-        # labels_multiply = label_remove * random_multiplier
-
-        labels = tf.concat([labels[:, :1], label_remove[:, 1:]], axis=-1)
-    return x, labels
+        multiply_interval = (0.7, 1.3)
+        random_multiplier = tf.random.uniform(tf.shape(labels), multiply_interval[0], multiply_interval[1])
+        labels_multiply = label_remove * random_multiplier
+        labels_multiply = tf.concat([labels[:, :1], labels_multiply[:, 1:]], axis=-1)
+    return x, labels_multiply
 
 #----------------------------------------------------------------------------
 # Evaluate time-varying training parameters.

@@ -94,7 +94,7 @@ class TFRecordExporter:
     def add_labels(self, labels):
         if self.print_progress:
             print('%-40s\r' % 'Saving labels...', end='', flush=True)
-        assert labels.shape[0] == self.cur_images
+        # assert labels.shape[0] == self.cur_images
         with open(self.tfr_prefix + '-rxx.labels', 'wb') as f:
             np.save(f, labels.astype(np.float32))
 
@@ -534,7 +534,7 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 
 def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir='../modified_datasets/cars_flat_ratio_warnings', shuffle=False, width=512, height=512):
 
-    label_dir = 'C:/Users/Florian/Desktop/cars/labels_body-80_crop-multiple_update-orientation_update-body'
+    label_dir = 'C:/Users/Florian/Desktop/cars/labels_body-80_crop-multiple_update-orientation_update-body_background'
 
     with open('C:/Users/Florian/Desktop/cars/data.json') as json_file:
         data = json.load(json_file)
@@ -542,8 +542,9 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
     colors = data['labels'][1]['classes']
     manufacturers = data['labels'][2]['classes']
     bodies = data['labels'][3]['classes']
-    rotations = data['labels'][4]['classes']
+    orientations = data['labels'][4]['classes']
     ratios = data['labels'][5]['classes']
+    backgrounds = data['labels'][6]['classes']
 
     print('counting images')
     num_images = 0
@@ -551,14 +552,22 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
         if file.lower().endswith(".jpg"):
             num_images += 1
 
+    add_images = False
     with TFRecordExporter(tfrecord_dir, num_images) as tfr:
         labels = []
         for file in tqdm(sorted(os.listdir(image_dir))):
-            img_file = image_dir + '/' + file
-            label_file = label_dir + '/' + file + '.json'
+            if add_images:
+                img_file = image_dir + '/' + file
+                img = PIL.Image.open(img_file)
+                img = img.resize((width, height), PIL.Image.ANTIALIAS)
+                img = np.asarray(img)
+                img = img.transpose([2, 0, 1])  # HWC => CHW
+                canvas = np.zeros([3, width, width], dtype=np.uint8)
+                canvas[:, (width - height) // 2: (width + height) // 2] = img
+                tfr.add_image(img)
 
-            img = PIL.Image.open(img_file)
-            label_size = 1 + len(car_models) + len(colors) + len(manufacturers) + len(bodies) + len(rotations) + len(ratios)
+            label_file = label_dir + '/' + file + '.json'
+            label_size = 1 + len(car_models) + len(colors) + len(manufacturers) + len(bodies) + len(orientations) + len(ratios) + len(backgrounds)
             onehot = np.zeros(label_size, dtype=np.float32)
 
             with open(label_file) as json_file:
@@ -583,28 +592,17 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
                 onehot[car_data['labels']['body'] + offset] = 1.0
             offset += len(bodies)
 
-            if 'rotation' in car_data['labels']:
-                onehot[car_data['labels']['rotation'] + offset] = 1.0
-            offset += len(rotations)
+            if 'orientation' in car_data['labels']:
+                onehot[car_data['labels']['orientation'] + offset] = 1.0
+            offset += len(orientations)
 
             if 'ratio' in car_data['labels']:
                 onehot[car_data['labels']['ratio'] + offset] = 1.0
+            offset += len(ratios)
 
-            img = img.resize((width, height), PIL.Image.ANTIALIAS)
-            img = np.asarray(img)
-            if len(img.shape) is not 3:
-                print(img_file)
-                print('len(img.shape) is not 3')
-                continue
-            if img.shape[2] is not 3:
-                print(img_file)
-                print('img.shape[2] is not 3')
-                continue
+            if 'background' in car_data['labels']:
+                onehot[car_data['labels']['background'] + offset] = 1.0
 
-            img = img.transpose([2, 0, 1]) # HWC => CHW
-            # canvas = np.zeros([3, width, width], dtype=np.uint8)
-            # canvas[:, (width - height) // 2: (width + height) // 2] = img
-            tfr.add_image(img)
             labels.append(onehot)
         tfr.add_labels(np.asarray(labels))
 
