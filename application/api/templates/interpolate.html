@@ -37,8 +37,8 @@
                     "size": 256
                 }
                 $.ajax({
-                    url: "http://127.0.0.1:5000/image",
-                    //url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/image",
+                    //url: "http://127.0.0.1:5000/image",
+                    url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/image",
                     type: "POST",
                     data: JSON.stringify({"payload": sendData}),
                     contentType: 'application/json',
@@ -83,8 +83,8 @@
                     "size": 256
                 }
                 $.ajax({
-                    url: "http://127.0.0.1:5000/image",
-                    //url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/image",
+                    //url: "http://127.0.0.1:5000/image",
+                    url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/image",
                     type: "POST",
                     data: JSON.stringify({"payload": sendData}),
                     contentType: 'application/json',
@@ -154,8 +154,8 @@
                 "seed_right": seed_right
             }
             $.ajax({
-                url: "http://127.0.0.1:5000/load_interpolations",
-                //url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/interpolate",
+                //url: "http://127.0.0.1:5000/load_interpolations",
+                url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/load_interpolations",
                 type: "POST",
                 data: JSON.stringify({"payload": sendData}),
                 contentType: 'application/json',

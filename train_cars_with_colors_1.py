@@ -54,6 +54,10 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     train.total_kimg = total_kimg
     train.mirror_augment = mirror_augment
     train.image_snapshot_ticks = train.network_snapshot_ticks = 10
+
+    train.resume_pkl = 'results/00021-stylegan2-all_cars_all_labels_256-2gpu-config-f/network-snapshot-009273.pkl'
+    train.resume_kimg = 9273.7
+
     sched.G_lrate_base = sched.D_lrate_base = 0.002
     sched.minibatch_size_base = 32
     sched.minibatch_gpu_base = 4

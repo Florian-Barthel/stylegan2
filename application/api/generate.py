@@ -14,7 +14,7 @@ session = tflib.create_session(None, force_as_default=True)
 latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
 dlatent_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 512))
 label_placeholder = tf.placeholder(tf.float32, shape=(None, 127))
-_G, _D, Gs = misc.load_pkl('../../results/00037-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-004512.pkl')
+_G, _D, Gs = misc.load_pkl('../../results/00037-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-006557.pkl')
 gen_image = Gs.get_output_for(latent_placeholder, label_placeholder, is_validation=True, randomize_noise=False,
                               truncation_psi_val=1.0)
 mapping = Gs.components.mapping.get_output_for(latent_placeholder, label_placeholder, is_validation=True,
@@ -53,7 +53,7 @@ def single_image(label, seed, size):
     return img
 
 
-def interpolations(label_left, seed_left, label_right, seed_right, batch_size=5, cache_size=25):
+def interpolations(label_left, seed_left, label_right, seed_right, batch_size=16, cache_size=32):
     global last_interpolation_answer
     global last_interpolation_request
 

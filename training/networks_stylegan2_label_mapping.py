@@ -12,6 +12,7 @@ import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d, upsample_conv_2d, conv_downsample_2d
 from dnnlib.tflib.ops.fused_bias_act import fused_bias_act
+from dnnlib.tflib.autosummary import autosummary
 
 # NOTE: Do not import any application-specific modules here!
 # Specify all network parameters as kwargs.
@@ -90,11 +91,14 @@ def modulated_conv2d_layer(x, y, fmaps, kernel, up=False, down=False, demodulate
     assert not (up and down)
     assert kernel >= 1 and kernel % 2 == 1
 
+    # Get weight.
+    w = get_weight([kernel, kernel, x.shape[1].value, fmaps], gain=gain, use_wscale=use_wscale, lrmul=lrmul, weight_var=weight_var)
+    ww = w[np.newaxis] # [BkkIO] Introduce minibatch dimension.
+
     # Modulate.
-    num_fmaps = kernel * kernel * x.shape[1].value * fmaps
-    s = dense_layer(y, fmaps=num_fmaps, weight_var=mod_weight_var) # [BI] Transform incoming W to style.
+    s = dense_layer(y, fmaps=x.shape[1].value, weight_var=mod_weight_var) # [BI] Transform incoming W to style.
     s = apply_bias_act(s, bias_var=mod_bias_var) + 1 # [BI] Add bias (initially 1).
-    ww = tf.reshape(s, [-1, kernel, kernel, x.shape[1].value, fmaps])
+    ww *= tf.cast(s[:, np.newaxis, np.newaxis, :, np.newaxis], w.dtype) # [BkkIO] Scale input feature maps.
 
     # Demodulate.
     if demodulate:
@@ -159,7 +163,8 @@ def G_main(
     return_dlatents         = False,                    # Return dlatents in addition to the images?
     is_template_graph       = False,                    # True = template graph constructed by the Network class, False = actual evaluation.
     components              = dnnlib.EasyDict(),        # Container for sub-networks. Retained between calls.
-    mapping_func            = 'G_mapping',              # Build func name for the mapping network.
+    mapping_latent_func     = 'G_mapping_latent',       # Build func name for the mapping network.
+    mapping_label_func      = 'G_mapping_label',        # Build func name for the mapping network.
     synthesis_func          = 'G_synthesis_stylegan2',  # Build func name for the synthesis network.
     **kwargs):                                          # Arguments for sub-networks (mapping and synthesis).
 
@@ -183,16 +188,26 @@ def G_main(
         components.synthesis = tflib.Network('G_synthesis', func_name=globals()[synthesis_func], **kwargs)
     num_layers = components.synthesis.input_shape[1]
     dlatent_size = components.synthesis.input_shape[2]
-    if 'mapping' not in components:
-        components.mapping = tflib.Network('G_mapping', func_name=globals()[mapping_func], dlatent_broadcast=num_layers, **kwargs)
+    if 'mapping_latent' not in components:
+        components.mapping_latent = tflib.Network('G_mapping_latent', func_name=globals()[mapping_latent_func], dlatent_broadcast=num_layers, **kwargs)
+    if 'mapping_label' not in components:
+        components.mapping_label = tflib.Network('G_mapping_label', func_name=globals()[mapping_label_func], dlatent_broadcast=num_layers, **kwargs)
+
 
     # Setup variables.
     lod_in = tf.get_variable('lod', initializer=np.float32(0), trainable=False)
     dlatent_avg = tf.get_variable('dlatent_avg', shape=[dlatent_size], initializer=tf.initializers.zeros(), trainable=False)
 
     # Evaluate mapping network.
-    dlatents = components.mapping.get_output_for(latents_in, labels_in, is_training=is_training, **kwargs)
+    dlatents = components.mapping_latent.get_output_for(latents_in, is_training=is_training, **kwargs)
     dlatents = tf.cast(dlatents, tf.float32)
+    autosummary('l2_norm_dlatents', tf.norm(dlatents, ord=2))
+
+    dlatents_label = components.mapping_label.get_output_for(labels_in, is_training=is_training, **kwargs)
+    dlatents_label = tf.cast(dlatents_label, tf.float32)
+    autosummary('l2_norm_dlatents_label', tf.norm(dlatents_label, ord=2))
+
+    dlatents = dlatents + dlatents_label
 
     # Update moving average of W.
     if dlatent_avg_beta is not None:
@@ -206,8 +221,11 @@ def G_main(
     if style_mixing_prob is not None:
         with tf.variable_scope('StyleMix'):
             latents2 = tf.random_normal(tf.shape(latents_in))
-            dlatents2 = components.mapping.get_output_for(latents2, labels_in, is_training=is_training, **kwargs)
+            dlatents2 = components.mapping_latent.get_output_for(latents2, is_training=is_training, **kwargs)
             dlatents2 = tf.cast(dlatents2, tf.float32)
+            dlatents_label2 = components.mapping_label.get_output_for(labels_in, is_training=is_training, **kwargs)
+            dlatents_label2 = tf.cast(dlatents_label2, tf.float32)
+            dlatents2 = dlatents2 + dlatents_label2
             layer_idx = np.arange(num_layers)[np.newaxis, :, np.newaxis]
             cur_layers = num_layers - tf.cast(lod_in, tf.int32) * 2
             mixing_cutoff = tf.cond(
@@ -245,11 +263,9 @@ def G_main(
 # Transforms the input latent code (z) to the disentangled latent code (w).
 # Used in configs B-F (Table 1).
 
-def G_mapping(
+def G_mapping_latent(
     latents_in,                             # First input: Latent vectors (Z) [minibatch, latent_size].
-    labels_in,                              # Second input: Conditioning labels [minibatch, label_size].
     latent_size             = 512,          # Latent vector (Z) dimensionality.
-    label_size              = 0,            # Label dimensionality, 0 if no labels.
     dlatent_size            = 512,          # Disentangled latent (W) dimensionality.
     dlatent_broadcast       = None,         # Output disentangled latent (W) as [minibatch, dlatent_size] or [minibatch, dlatent_broadcast, dlatent_size].
     mapping_layers          = 8,            # Number of mapping layers.
@@ -264,17 +280,8 @@ def G_mapping(
 
     # Inputs.
     latents_in.set_shape([None, latent_size])
-    labels_in.set_shape([None, label_size])
     latents_in = tf.cast(latents_in, dtype)
-    labels_in = tf.cast(labels_in, dtype)
     x = latents_in
-
-    # Embed labels and concatenate them with latents.
-    if label_size:
-        with tf.variable_scope('LabelConcat'):
-            w = tf.get_variable('weight', shape=[label_size, latent_size], initializer=tf.initializers.random_normal())
-            y = tf.matmul(labels_in, tf.cast(w, dtype))
-            x = tf.concat([x, y], axis=1)
 
     # Normalize latents.
     if normalize_latents:
@@ -295,6 +302,40 @@ def G_mapping(
     # Output.
     assert x.dtype == tf.as_dtype(dtype)
     return tf.identity(x, name='dlatents_out')
+
+def G_mapping_label(
+    labels_in,                              # Second input: Conditioning labels [minibatch, label_size].
+    label_size              = 0,            # Label dimensionality, 0 if no labels.
+    dlatent_size            = 512,          # Disentangled latent (W) dimensionality.
+    dlatent_broadcast       = None,         # Output disentangled latent (W) as [minibatch, dlatent_size] or [minibatch, dlatent_broadcast, dlatent_size].
+    mapping_layers          = 8,            # Number of mapping layers.
+    mapping_fmaps           = 512,          # Number of activations in the mapping layers.
+    mapping_lrmul           = 0.01,         # Learning rate multiplier for the mapping layers.
+    mapping_nonlinearity    = 'lrelu',      # Activation function: 'relu', 'lrelu', etc.
+    dtype                   = 'float32',    # Data type to use for activations and outputs.
+    **_kwargs):                             # Ignore unrecognized keyword args.
+
+    act = mapping_nonlinearity
+
+    # Inputs.
+    labels_in.set_shape([None, label_size])
+    labels_in = tf.cast(labels_in, dtype)
+    x = labels_in
+
+    # Mapping layers.
+    for layer_idx in range(mapping_layers):
+        with tf.variable_scope('Dense%d' % layer_idx):
+            fmaps = dlatent_size if layer_idx == mapping_layers - 1 else mapping_fmaps
+            x = apply_bias_act(dense_layer(x, fmaps=fmaps, lrmul=mapping_lrmul), act=act, lrmul=mapping_lrmul)
+
+    # Broadcast.
+    if dlatent_broadcast is not None:
+        with tf.variable_scope('Broadcast'):
+            x = tf.tile(x[:, np.newaxis], [1, dlatent_broadcast, 1])
+
+    # Output.
+    assert x.dtype == tf.as_dtype(dtype)
+    return tf.identity(x, name='label_dlatents_out')
 
 #----------------------------------------------------------------------------
 # StyleGAN synthesis network with revised architecture (Figure 2d).

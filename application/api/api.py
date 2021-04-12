@@ -2,10 +2,10 @@ from flask import Flask, render_template, request, jsonify
 import io, sys
 import numpy as np
 import base64
-import application.api.generate as generate
 from flask_cors import CORS
 
 sys.path.append("../../")
+import application.api.generate as generate
 
 app = Flask(__name__)
 CORS(app)
@@ -104,5 +104,5 @@ def after_request(response):
 
 
 if __name__ == '__main__':
-    app.run(debug=False)
-    # app.run(host='0.0.0.0', debug=False)
+    # app.run(debug=False)
+    app.run(host='0.0.0.0', debug=False)

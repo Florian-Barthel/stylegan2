@@ -38,8 +38,8 @@ _valid_configs = [
 
 def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, mirror_augment, metrics):
     train     = EasyDict(run_func_name='training.training_loop_randomize_labels.training_loop') # Options for training loop.
-    G         = EasyDict(func_name='training.networks_stylegan2_predict_weights.G_main')       # Options for generator network.
-    D         = EasyDict(func_name='training.networks_stylegan2_predict_weights.D_stylegan2')  # Options for discriminator network.
+    G         = EasyDict(func_name='training.networks_stylegan2_label_mapping.G_main')       # Options for generator network.
+    D         = EasyDict(func_name='training.networks_stylegan2_label_mapping.D_stylegan2')  # Options for discriminator network.
     G_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for generator optimizer.
     D_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for discriminator optimizer.
     G_loss    = EasyDict(func_name='training.loss.G_logistic_ns_pathreg')      # Options for generator loss.
@@ -73,8 +73,6 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     # Configs A-E: Shrink networks to match original StyleGAN.
     if config_id != 'config-f':
         G.fmap_base = D.fmap_base = 8 << 10
-    G.fmap_base =  16 << 3
-    D.fmap_base = 16 << 10
 
     # Config E: Set gamma to 100 and override G & D architecture.
     if config_id.startswith('config-e'):
@@ -96,7 +94,7 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
         sched.minibatch_gpu_base = 4 # (default)
         sched.minibatch_gpu_dict = {8: 32, 16: 16, 32: 8, 64: 4}
         G.synthesis_func = 'G_synthesis_stylegan_revised'
-        D.func_name = 'training.networks_stylegan2_predict_weights.D_stylegan'
+        D.func_name = 'training.networks_stylegan2.D_stylegan'
 
     # Configs A-C: Disable path length regularization.
     if config_id in ['config-a', 'config-b', 'config-c']:
@@ -108,8 +106,8 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
 
     # Config A: Switch to original StyleGAN networks.
     if config_id == 'config-a':
-        G = EasyDict(func_name='training.networks_stylegan2_predict_weights.G_style')
-        D = EasyDict(func_name='training.networks_stylegan2_predict_weights.D_basic')
+        G = EasyDict(func_name='training.networks_stylegan.G_style')
+        D = EasyDict(func_name='training.networks_stylegan.D_basic')
 
     if gamma is not None:
         D_loss.gamma = gamma
