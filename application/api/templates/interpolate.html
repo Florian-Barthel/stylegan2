@@ -9,6 +9,9 @@
     <script>
         var image_cache = []
         var global_cache_size = 0
+        var address = "http://127.0.0.1:5000"
+        //var address = "http://mmc-cuda04.informatik.uni-augsburg.de:5000"
+        //var address = "http://gimpel.informatik.uni-augsburg.de:5000"
 
         window.onload = () => {
             $('#sendbutton').click(() => {
@@ -37,8 +40,8 @@
                     "size": 256
                 }
                 $.ajax({
-                    //url: "http://127.0.0.1:5000/image",
-                    url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/image",
+
+                    url: address + "/image",
                     type: "POST",
                     data: JSON.stringify({"payload": sendData}),
                     contentType: 'application/json',
@@ -83,8 +86,7 @@
                     "size": 256
                 }
                 $.ajax({
-                    //url: "http://127.0.0.1:5000/image",
-                    url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/image",
+                    url: address + "/image",
                     type: "POST",
                     data: JSON.stringify({"payload": sendData}),
                     contentType: 'application/json',
@@ -154,8 +156,7 @@
                 "seed_right": seed_right
             }
             $.ajax({
-                //url: "http://127.0.0.1:5000/load_interpolations",
-                url: "http://mmc-cuda04.informatik.uni-augsburg.de:5000/load_interpolations",
+                url: address + "/load_interpolations",
                 type: "POST",
                 data: JSON.stringify({"payload": sendData}),
                 contentType: 'application/json',
@@ -197,7 +198,7 @@
                             class="sr-only">(current)</span></a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link disabled" href="#">Explore</a>
+                    <a class="nav-link" href="/3d_view">360 View</a>
                 </li>
             </ul>
         </div>

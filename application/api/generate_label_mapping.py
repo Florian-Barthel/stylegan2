@@ -7,9 +7,6 @@ import io
 import base64
 from flask import jsonify
 
-tflib.init_tf({'gpu_options.allow_growth': True})
-
-
 last_interpolation_request = [None, None, None, None]
 last_interpolation_answer = None
 
@@ -17,11 +14,14 @@ session = tflib.create_session(None, force_as_default=True)
 latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
 dlatent_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 512))
 label_placeholder = tf.placeholder(tf.float32, shape=(None, 127))
-_G, _D, Gs = misc.load_pkl('../../results/00087-stylegan2-cars_v4_512-4gpu-config-f/network-snapshot-006256.pkl')
+_G, _D, Gs = misc.load_pkl('../../results/00070-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-007219.pkl')
 gen_image = Gs.get_output_for(latent_placeholder, label_placeholder, is_validation=True, randomize_noise=False,
                               truncation_psi_val=1.0)
-mapping = Gs.components.mapping.get_output_for(latent_placeholder, label_placeholder, is_validation=True,
+mapping_latent = Gs.components.mapping_latent.get_output_for(latent_placeholder, is_validation=True,
                                                truncation_psi_val=1.0)
+mapping_label = Gs.components.mapping_label.get_output_for(label_placeholder, is_validation=True,
+                                               truncation_psi_val=1.0)
+
 synthesis = Gs.components.synthesis.get_output_for(dlatent_placeholder, is_validation=True, randomize_noise=False,
                                                    truncation_psi_val=1.0)
 
@@ -64,12 +64,17 @@ def interpolations(label_left, seed_left, label_right, seed_right, batch_size=5,
         if np.array_equal([label_left, label_right], last_interpolation_request[2:]):
             return last_interpolation_answer
     last_interpolation_request = [seed_left, seed_right, label_left, label_right]
-
     interpolation_cache = np.zeros([cache_size, 512, 512, 3], dtype=np.uint8)
     latent_left = np.random.RandomState(seed_left).normal(0, 1, [1, Gs.input_shape[1]]).astype(np.float32)
     latent_right = np.random.RandomState(seed_right).normal(0, 1, [1, Gs.input_shape[1]]).astype(np.float32)
-    dlatent_left = session.run(mapping, feed_dict={latent_placeholder: latent_left, label_placeholder: label_left})[0]
-    dlatent_right = session.run(mapping, feed_dict={latent_placeholder: latent_right, label_placeholder: label_right})[0]
+
+    dlatent_left = session.run(mapping_latent, feed_dict={latent_placeholder: latent_left})[0]
+    dlabel_left = session.run(mapping_label, feed_dict={label_placeholder: label_left})[0]
+    dlatent_left = dlatent_left + dlabel_left
+
+    dlatent_right = session.run(mapping_latent, feed_dict={latent_placeholder: latent_right})[0]
+    dlabel_right = session.run(mapping_label, feed_dict={label_placeholder: label_right})[0]
+    dlatent_right = dlatent_right + dlabel_right
 
     interpolation_dlatents = []
     for i in range(cache_size):
@@ -100,69 +105,3 @@ def interpolations(label_left, seed_left, label_right, seed_right, batch_size=5,
         json_list.append(str(img_base64))
     last_interpolation_answer = jsonify({'status': json_list, 'cache_size': cache_size})
     return last_interpolation_answer
-
-
-def label_vector_rotation(model, color, manufacturer, body, ratio, background):
-    onehot = np.zeros((8, 1, 127), dtype=np.float32)
-    onehot[:, 0, 0] = 1
-    if model >= 0:
-        onehot[:, 0, 1 + model] = 1.0
-    if color >= 0:
-        onehot[:, 0, 1 + 67 + color] = 1.0
-    if manufacturer >= 0:
-        onehot[:, 0, 1 + 67 + 12 + manufacturer] = 1.0
-    if body >= 0:
-        onehot[:, 0, 1 + 67 + 12 + 18 + body] = 1.0
-
-    onehot[0, 0, 1 + 67 + 12 + 18 + 10 + 0] = 1.0
-    onehot[1, 0, 1 + 67 + 12 + 18 + 10 + 1] = 1.0
-    onehot[2, 0, 1 + 67 + 12 + 18 + 10 + 3] = 1.0
-    onehot[3, 0, 1 + 67 + 12 + 18 + 10 + 6] = 1.0
-    onehot[4, 0, 1 + 67 + 12 + 18 + 10 + 5] = 1.0
-    onehot[5, 0, 1 + 67 + 12 + 18 + 10 + 7] = 1.0
-    onehot[6, 0, 1 + 67 + 12 + 18 + 10 + 4] = 1.0
-    onehot[7, 0, 1 + 67 + 12 + 18 + 10 + 2] = 1.0
-
-    onehot[:, 0, 1 + 67 + 12 + 18 + 10 + 8 + ratio] = 1.0
-    if background >= 0:
-        onehot[:, 0, 1 + 67 + 12 + 18 + 10 + 8 + 5 + background] = 1.0
-    return onehot
-
-
-def rotations(labels, seed, batch_size=5, interpolation_cache_size=20):
-    json_list = []
-
-    for i in range(8):
-        interpolation_cache = np.zeros([interpolation_cache_size, 512, 512, 3], dtype=np.uint8)
-        latent_left = np.random.RandomState(seed).normal(0, 1, [1, Gs.input_shape[1]]).astype(np.float32)
-        latent_right = np.random.RandomState(seed).normal(0, 1, [1, Gs.input_shape[1]]).astype(np.float32)
-        dlatent_left = session.run(mapping, feed_dict={latent_placeholder: latent_left, label_placeholder: labels[i]})[0]
-        dlatent_right = session.run(mapping, feed_dict={latent_placeholder: latent_right, label_placeholder: labels[(i + 1) % 8]})[0]
-
-        interpolation_dlatents = []
-        for i in range(interpolation_cache_size):
-            magnitude = i / (interpolation_cache_size - 1)
-            interpolation_dlatents.append(dlatent_left * (1 - magnitude) + dlatent_right * magnitude)
-
-        images_left = interpolation_cache_size
-        image_index = 0
-
-        while images_left > 0:
-            current_batch_size = min(images_left, batch_size)
-            dlatent_interpolate = interpolation_dlatents[image_index:image_index + current_batch_size]
-            image = session.run(synthesis, feed_dict={dlatent_placeholder: dlatent_interpolate})
-            image = np.transpose(image, [0, 2, 3, 1])
-            image = image * 127.5 + 127.5
-            image = np.clip(image, 0, 255).astype(np.uint8)
-            interpolation_cache[image_index:image_index + current_batch_size] = image
-            images_left -= current_batch_size
-            image_index += current_batch_size
-
-        for i in range(interpolation_cache_size):
-            img = Image.fromarray(interpolation_cache[i])
-            rawBytes = io.BytesIO()
-            img.save(rawBytes, "JPEG")
-            rawBytes.seek(0)
-            img_base64 = base64.b64encode(rawBytes.read())
-            json_list.append(str(img_base64))
-    return jsonify({'status': json_list, 'cache_size': interpolation_cache_size * 8, 'seed': seed})

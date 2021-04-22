@@ -6,6 +6,7 @@ from flask_cors import CORS
 
 sys.path.append("../../")
 import application.api.generate as generate
+# import application.api.generate_label_mapping as generate
 
 app = Flask(__name__)
 CORS(app)
@@ -42,6 +43,32 @@ def image():
     rawBytes.seek(0)
     img_base64 = base64.b64encode(rawBytes.read())
     return jsonify({'status': str(img_base64), 'seed': seed})
+
+
+
+@app.route('/load_3d_view', methods=['POST'])
+def load_3d_view():
+    data = request.get_json()
+    payload = data['payload']
+    manufacturer = int(payload['manufacturer'])
+    model = int(payload['model'])
+    color = int(payload['color'])
+    body = int(payload['body'])
+    ratio = int(payload['ratio'])
+    background = int(payload['background'])
+    seed = int(payload['seed'])
+    randomize_seed = payload['randomize_seed']
+    if randomize_seed:
+        seed = int(np.random.uniform() * (2 ** 32 - 1))
+
+    labels = generate.label_vector_rotation(model=model,
+                                       color=color,
+                                       manufacturer=manufacturer,
+                                       body=body,
+                                       ratio=ratio,
+                                       background=background)
+
+    return generate.rotations(labels, seed)
 
 
 @app.route('/load_interpolations', methods=['POST'])
@@ -94,6 +121,10 @@ def index():
 def interpolate():
     return render_template('interpolate.html')
 
+@app.route('/3d_view')
+def rotation():
+    return render_template('3d_view.html')
+
 
 @app.after_request
 def after_request(response):
@@ -104,5 +135,5 @@ def after_request(response):
 
 
 if __name__ == '__main__':
-    # app.run(debug=False)
-    app.run(host='0.0.0.0', debug=False)
+    app.run(debug=False)
+    # app.run(host='0.0.0.0', debug=False)
