@@ -93,7 +93,7 @@ def modulated_conv2d_layer(x, y, fmaps, kernel, up=False, down=False, demodulate
     # Modulate.
     num_fmaps = kernel * kernel * x.shape[1].value * fmaps
     s = dense_layer(y, fmaps=num_fmaps, weight_var=mod_weight_var) # [BI] Transform incoming W to style.
-    s = apply_bias_act(s, bias_var=mod_bias_var) + 1 # [BI] Add bias (initially 1).
+    s = apply_bias_act(s, bias_var=mod_bias_var) + 1 / (kernel ** 2) # [BI] Add bias (initially 1).
     ww = tf.reshape(s, [-1, kernel, kernel, x.shape[1].value, fmaps])
 
     # Demodulate.
