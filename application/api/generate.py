@@ -9,17 +9,20 @@ import base64
 
 class Generate:
     def __init__(self):
-        tflib.init_tf({'gpu_options.allow_growth': True})
-        self.session = tflib.create_session(None, force_as_default=True)
-        self.latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
-        self.dlatent_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 512))
-        self.label_placeholder = tf.placeholder(tf.float32, shape=(None, 127))
+        self.session = None
+        self.latent_placeholder = None
+        self.dlatent_placeholder = None
+        self.label_placeholder = None
         self.Gs = None
         self.mapping = None
         self.synthesis = None
 
     def load_network(self, network_path):
-        _G, _D, self.Gs = misc.load_pkl('../../' + network_path)
+        self.session = tflib.create_session(None, force_as_default=True)
+        _G, _D, self.Gs = misc.load_pkl('../../results/' + network_path)
+        self.latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
+        self.dlatent_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 512))
+        self.label_placeholder = tf.placeholder(tf.float32, shape=(None, 127))
         if 'mapping' in self.Gs.components:
             self.mapping = self.Gs.components.mapping.get_output_for(self.latent_placeholder, self.label_placeholder)
         else:

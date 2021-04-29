@@ -4,12 +4,13 @@ import numpy as np
 from flask_cors import CORS
 import application.api.generate_label as generate_label
 import application.api.generate as generate
+import os
 
 sys.path.append("../../")
 app = Flask(__name__)
 CORS(app)
 generator = generate.Generate()
-generator.load_network('results/00092-stylegan2-cars_v4_512-4gpu-config-f/network-snapshot-001925.pkl')
+generator.load_network('00093-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-001504.pkl')
 
 
 @app.route('/image', methods=['GET', 'POST'])
@@ -55,6 +56,24 @@ def load_interpolations():
     return jsonify({'status': result, 'cache_size': cache_size})
 
 
+@app.route('/get_networks', methods=['GET', 'POST'])
+def get_networks():
+    result = []
+    for run in os.listdir('../../results'):
+        if int(run[:5]) >= 37:
+            for file in os.listdir('../../results/' + run):
+                if file.lower().startswith('network-snapshot'):
+                    result.append(run + '/' + file)
+    return jsonify({'status': result})
+
+
+@app.route('/load_network', methods=['GET', 'POST'])
+def load_network():
+    network_path = request.args.get('network_path')
+    generator.load_network(network_path)
+    return render_template('index.html')
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -68,6 +87,11 @@ def interpolate():
 @app.route('/3d_view')
 def rotation():
     return render_template('3d_view.html')
+
+
+@app.route('/change_network')
+def change_network():
+    return render_template('change_network.html')
 
 
 @app.after_request
