@@ -1,115 +1,58 @@
 from flask import Flask, render_template, request, jsonify
-import io, sys
+import sys
 import numpy as np
-import base64
 from flask_cors import CORS
+import application.api.generate_label as generate_label
+import application.api.generate as generate
 
 sys.path.append("../../")
-import application.api.generate as generate
-# import application.api.generate_label_mapping as generate
-
 app = Flask(__name__)
 CORS(app)
+generator = generate.Generate()
+generator.load_network('results/00092-stylegan2-cars_v4_512-4gpu-config-f/network-snapshot-001925.pkl')
 
 
 @app.route('/image', methods=['GET', 'POST'])
 def image():
     data = request.get_json()
     payload = data['payload']
-    manufacturer = int(payload['manufacturer'])
-    model = int(payload['model'])
-    color = int(payload['color'])
-    body = int(payload['body'])
-    rotation = int(payload['rotation'])
-    ratio = int(payload['ratio'])
-    background = int(payload['background'])
     randomize_seed = payload['randomize_seed']
     seed = int(payload['seed'])
     size = int(payload['size'])
-
-    label = generate.label_vector(model=model,
-                                  color=color,
-                                  manufacturer=manufacturer,
-                                  body=body,
-                                  rotation=rotation,
-                                  ratio=ratio,
-                                  background=background)
-
+    label = generate_label.label_vector(payload)
     if randomize_seed:
         seed = int(np.random.uniform() * (2 ** 32 - 1))
-    image = generate.single_image(label, seed, size)
-    rawBytes = io.BytesIO()
-    image.save(rawBytes, "JPEG")
-    rawBytes.seek(0)
-    img_base64 = base64.b64encode(rawBytes.read())
-    return jsonify({'status': str(img_base64), 'seed': seed})
-
+    result = generator.generate_single_image(label, seed, size)
+    return jsonify({'status': result, 'seed': seed})
 
 
 @app.route('/load_3d_view', methods=['POST'])
 def load_3d_view():
     data = request.get_json()
     payload = data['payload']
-    manufacturer = int(payload['manufacturer'])
-    model = int(payload['model'])
-    color = int(payload['color'])
-    body = int(payload['body'])
-    ratio = int(payload['ratio'])
-    background = int(payload['background'])
     seed = int(payload['seed'])
     randomize_seed = payload['randomize_seed']
     if randomize_seed:
         seed = int(np.random.uniform() * (2 ** 32 - 1))
-
-    labels = generate.label_vector_rotation(model=model,
-                                       color=color,
-                                       manufacturer=manufacturer,
-                                       body=body,
-                                       ratio=ratio,
-                                       background=background)
-
-    return generate.rotations(labels, seed)
+    labels = generate_label.label_vector_rotation(payload)
+    result, cache_size = generator.rotations(labels=labels, seed=seed)
+    return jsonify({'status': result, 'cache_size': cache_size, 'seed': seed})
 
 
 @app.route('/load_interpolations', methods=['POST'])
 def load_interpolations():
     data = request.get_json()
-    payload = data['payload']
-    manufacturer_left = int(payload['manufacturer_left'])
-    model_left = int(payload['model_left'])
-    color_left = int(payload['color_left'])
-    body_left = int(payload['body_left'])
-    rotation_left = int(payload['rotation_left'])
-    ratio_left = int(payload['ratio_left'])
-    background_left = int(payload['background_left'])
-    seed_left = int(payload['seed_left'])
-
-    label_left = generate.label_vector(model=model_left,
-                                       color=color_left,
-                                       manufacturer=manufacturer_left,
-                                       body=body_left,
-                                       rotation=rotation_left,
-                                       ratio=ratio_left,
-                                       background=background_left)
-
-    manufacturer_right = int(payload['manufacturer_right'])
-    model_right = int(payload['model_right'])
-    color_right = int(payload['color_right'])
-    body_right = int(payload['body_right'])
-    rotation_right = int(payload['rotation_right'])
-    ratio_right = int(payload['ratio_right'])
-    background_right = int(payload['background_right'])
-    seed_right = int(payload['seed_right'])
-
-    label_right = generate.label_vector(model=model_right,
-                                        color=color_right,
-                                        manufacturer=manufacturer_right,
-                                        body=body_right,
-                                        rotation=rotation_right,
-                                        ratio=ratio_right,
-                                        background=background_right)
-
-    return generate.interpolations(label_left, seed_left, label_right, seed_right)
+    payload_left = data['payload_left']
+    payload_right = data['payload_right']
+    seed_left = int(payload_left['seed'])
+    seed_right = int(payload_right['seed'])
+    label_left = generate_label.label_vector(payload_left)
+    label_right = generate_label.label_vector(payload_right)
+    result, cache_size = generator.interpolations(label_left=label_left,
+                                                  seed_left=seed_left,
+                                                  label_right=label_right,
+                                                  seed_right=seed_right)
+    return jsonify({'status': result, 'cache_size': cache_size})
 
 
 @app.route('/')
@@ -120,6 +63,7 @@ def index():
 @app.route('/interpolate')
 def interpolate():
     return render_template('interpolate.html')
+
 
 @app.route('/3d_view')
 def rotation():
@@ -135,5 +79,5 @@ def after_request(response):
 
 
 if __name__ == '__main__':
-    # app.run(debug=False)
-    app.run(host='0.0.0.0', debug=False)
+    app.run(debug=False)
+    # app.run(host='0.0.0.0', debug=False)

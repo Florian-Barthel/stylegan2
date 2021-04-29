@@ -9,8 +9,8 @@
     <script>
         var image_cache = []
         var global_cache_size = 0
-        //var address = "http://127.0.0.1:5000"
-        var address = "http://mmc-cuda04.informatik.uni-augsburg.de:5000"
+        var address = "http://127.0.0.1:5000"
+        //var address = "http://mmc-cuda04.informatik.uni-augsburg.de:5000"
         //var address = "http://gimpel.informatik.uni-augsburg.de:5000"
 
         window.onload = () => {
@@ -137,28 +137,32 @@
             background_right = document.getElementById("background").value
             seed_right = document.getElementById("seed").value
 
-            sendData = {
-                "manufacturer_left": manufacturer_left,
-                "model_left": model_left,
-                "color_left": color_left,
-                "body_left": body_left,
-                "rotation_left": rotation_left,
-                "ratio_left": ratio_left,
-                "background_left": background_left,
-                "seed_left": seed_left,
-                "manufacturer_right": manufacturer_right,
-                "model_right": model_right,
-                "color_right": color_right,
-                "body_right": body_right,
-                "rotation_right": rotation_right,
-                "ratio_right": ratio_right,
-                "background_right": background_right,
-                "seed_right": seed_right
+            payload_right = {
+                "manufacturer": manufacturer_right,
+                "model": model_right,
+                "color": color_right,
+                "body": body_right,
+                "rotation": rotation_right,
+                "ratio": ratio_right,
+                "background": background_right,
+                "seed": seed_right
             }
+
+            payload_left = {
+                "manufacturer": manufacturer_left,
+                "model": model_left,
+                "color": color_left,
+                "body": body_left,
+                "rotation": rotation_left,
+                "ratio": ratio_left,
+                "background": background_left,
+                "seed": seed_left
+            }
+
             $.ajax({
                 url: address + "/load_interpolations",
                 type: "POST",
-                data: JSON.stringify({"payload": sendData}),
+                data: JSON.stringify({"payload_left": payload_left, "payload_right": payload_right}),
                 contentType: 'application/json',
                 error: function (data, textStatus, errorThrown) {
                     console.log("upload error", data);
