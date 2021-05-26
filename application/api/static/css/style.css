@@ -4,7 +4,7 @@ select {
 
 .box {
     margin-left:20px;
-    margin-top: 20px;
+    margin-top: 10px;
 }
 
 input {
@@ -35,22 +35,15 @@ label {
     margin: 0;
 }
 
-td {
-    padding-right: 20px;
-}
-
-#interpolate_table {
-    padding: 0;
-    margin: 0;
-}
-
-.slider {
-    margin-left: 20px;
+td.main-table {
+    padding-left:10px;
+    min-width: 655px;
+    padding-top: 20px;
 }
 
 .slider {
     -webkit-appearance: none;
-    width: 300px;
+    width: 600px;
     height: 15px;
     border-radius: 5px;
     background: #d3d3d3;

@@ -2,15 +2,18 @@ from flask import Flask, render_template, request, jsonify
 import sys
 import numpy as np
 from flask_cors import CORS
+
+sys.path.append("../../")
 import application.api.generate_label as generate_label
 import application.api.generate as generate
 import os
 
-sys.path.append("../../")
 app = Flask(__name__)
 CORS(app)
 generator = generate.Generate()
-generator.load_network('00093-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-001504.pkl')
+
+
+# generator.load_network('00093-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-001504.pkl')
 
 
 @app.route('/image', methods=['GET', 'POST'])
@@ -49,11 +52,33 @@ def load_interpolations():
     seed_right = int(payload_right['seed'])
     label_left = generate_label.label_vector(payload_left)
     label_right = generate_label.label_vector(payload_right)
-    result, cache_size = generator.interpolations(label_left=label_left,
-                                                  seed_left=seed_left,
-                                                  label_right=label_right,
-                                                  seed_right=seed_right)
+    result, cache_size = generator.interpolations(
+        label_left=label_left,
+        seed_left=seed_left,
+        label_right=label_right,
+        seed_right=seed_right
+    )
     return jsonify({'status': result, 'cache_size': cache_size})
+
+
+@app.route('/load_interpolation_graph', methods=['POST'])
+def load_interpolation_graph():
+    data = request.get_json()
+    payload_left = data['payload_left']
+    payload_right = data['payload_right']
+    seed_left = int(payload_left['seed'])
+    seed_right = int(payload_right['seed'])
+    num_steps = int(data['num_steps'])
+    label_left = generate_label.label_vector(payload_left)
+    label_right = generate_label.label_vector(payload_right)
+    graph_image, linear_diff = generator.interpolation_graph(
+        label_left=label_left,
+        seed_left=seed_left,
+        label_right=label_right,
+        seed_right=seed_right,
+        num_steps=num_steps
+    )
+    return jsonify({'graph_image': graph_image, 'linear_diff': linear_diff})
 
 
 @app.route('/get_networks', methods=['GET', 'POST'])
