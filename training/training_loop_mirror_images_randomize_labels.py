@@ -17,6 +17,8 @@ from training import dataset
 from training import misc
 from metrics import metric_base
 
+tflib.init_tf({'gpu_options.allow_growth': True})
+
 #----------------------------------------------------------------------------
 # Just-in-time processing of training images before feeding them to the networks.
 
@@ -26,7 +28,17 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
         x = misc.adjust_dynamic_range(x, drange_data, drange_net)
     if mirror_augment:
         with tf.name_scope('MirrorAugment'):
-            x = tf.where(tf.random_uniform([tf.shape(x)[0]]) < 0.5, x, tf.reverse(x, [3]))
+            random_vector = tf.random_uniform([tf.shape(x)[0]]) < 0.5
+            x = tf.where(random_vector, x, tf.reverse(x, [3]))
+            rotation_offset = 1 + 67 + 12 + 18 + 10
+
+            indices_first = tf.range(rotation_offset)
+            swaps = tf.constant([0, 2, 1, 4, 3, 5, 7, 6]) + rotation_offset
+            indices_last = tf.range(rotation_offset + 8, tf.shape(labels)[1])
+            indices = tf.concat([indices_first, swaps, indices_last], axis=0)
+            mirrored_labels = tf.gather(labels, indices, axis=1)
+            labels = tf.where(random_vector, labels, mirrored_labels)
+
     with tf.name_scope('FadeLOD'): # Smooth crossfade between consecutive levels-of-detail.
         s = tf.shape(x)
         y = tf.reshape(x, [-1, s[1], s[2]//2, 2, s[3]//2, 2])
@@ -41,16 +53,12 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
         x = tf.tile(x, [1, 1, 1, factor, 1, factor])
         x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
     with tf.name_scope('RandomizeLabels'):
-        keep_probability = 0.90
+        keep_probability = 0.80
         labels_bool = tf.cast(labels, tf.bool)
         mask = tf.random.uniform(tf.shape(labels), 0.0, 1.0) > (1 - keep_probability)
         label_remove = tf.cast(tf.math.logical_and(labels_bool, mask), dtype=tf.float32)
-
-        multiply_interval = (0.7, 1.3)
-        random_multiplier = tf.random.uniform(tf.shape(labels), multiply_interval[0], multiply_interval[1])
-        labels_multiply = label_remove * random_multiplier
-        labels_multiply = tf.concat([labels[:, :1], labels_multiply[:, 1:]], axis=-1)
-    return x, labels_multiply
+        labels = tf.concat([labels[:, :1], label_remove[:, 1:]], axis=-1)
+    return x, labels
 
 #----------------------------------------------------------------------------
 # Evaluate time-varying training parameters.
@@ -170,9 +178,6 @@ def training_loop(
     G.print_layers(); D.print_layers()
     sched = training_schedule(cur_nimg=total_kimg*1000, training_set=training_set, **sched_args)
     grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
-    # label_grid_latents = np.random.normal(0, 1, [2, 1, Gs.input_shape[1]])
-    grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu)
-    misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes_init.png'), drange=drange_net, grid_size=grid_size)
 
     # Setup training inputs.
     print('Building TensorFlow graph...')
@@ -344,10 +349,10 @@ def training_loop(
             autosummary('Timing/total_days', total_time / (24.0 * 60.0 * 60.0))
 
             # Save snapshots.
-            if image_snapshot_ticks is not None and (cur_tick % image_snapshot_ticks == 0 or done):
-                grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu)
-                misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes%06d.png' % (cur_nimg // 1000)), drange=drange_net, grid_size=grid_size)
-                # generate_images_with_labels(dnnlib.make_run_dir_path('labels%06d.png' % (cur_nimg // 1000)), Gs, w=256, h=256, num_labels=training_set.label_size, latents=label_grid_latents)
+            # if image_snapshot_ticks is not None and (cur_tick % image_snapshot_ticks == 0 or done):
+            #     grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, minibatch_size=sched.minibatch_gpu)
+            #     misc.save_image_grid(grid_fakes, dnnlib.make_run_dir_path('fakes%06d.png' % (cur_nimg // 1000)), drange=drange_net, grid_size=grid_size)
+            #     # generate_images_with_labels(dnnlib.make_run_dir_path('labels%06d.png' % (cur_nimg // 1000)), Gs, w=256, h=256, num_labels=training_set.label_size, latents=label_grid_latents)
             if network_snapshot_ticks is not None and (cur_tick % network_snapshot_ticks == 0 or done):
                 pkl = dnnlib.make_run_dir_path('network-snapshot-%06d.pkl' % (cur_nimg // 1000))
                 misc.save_pkl((G, D, Gs), pkl)

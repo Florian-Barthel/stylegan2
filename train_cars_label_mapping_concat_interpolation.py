@@ -35,16 +35,15 @@ _valid_configs = [
 
 #----------------------------------------------------------------------------
 
+
 def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, mirror_augment, metrics):
-
-
-    train     = EasyDict(run_func_name='training.training_loop.training_loop') # Options for training loop.
-    G         = EasyDict(func_name='training.networks_stylegan2.G_main')       # Options for generator network.
-    D         = EasyDict(func_name='training.networks_stylegan2.D_stylegan2')  # Options for discriminator network.
+    train     = EasyDict(run_func_name='training.training_loop_mirror_images_randomize_labels.training_loop') # Options for training loop.
+    G         = EasyDict(func_name='training.networks_stylegan2_label_mapping_concat.G_main')       # Options for generator network.
+    D         = EasyDict(func_name='training.networks_stylegan2_label_mapping_concat.D_stylegan2')  # Options for discriminator network.
     G_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for generator optimizer.
     D_opt     = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                  # Options for discriminator optimizer.
-    G_loss    = EasyDict(func_name='training.loss.G_logistic_ns_pathreg')      # Options for generator loss.
-    D_loss    = EasyDict(func_name='training.loss.D_logistic_r1')              # Options for discriminator loss.
+    G_loss    = EasyDict(func_name='training.loss_label_mapping_concat_interpolate.G_logistic_ns_pathreg_interpolate')      # Options for generator loss.
+    D_loss    = EasyDict(func_name='training.loss_label_mapping_concat_interpolate.D_logistic_r1')              # Options for discriminator loss.
     sched     = EasyDict()                                                     # Options for TrainingSchedule.
     grid      = EasyDict(size='8k', layout='random')                           # Options for setup_snapshot_image_grid().
     sc        = dnnlib.SubmitConfig()                                          # Options for dnnlib.submit_run().
@@ -54,10 +53,6 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     train.total_kimg = total_kimg
     train.mirror_augment = mirror_augment
     train.image_snapshot_ticks = train.network_snapshot_ticks = 10
-
-    train.resume_pkl = 'results/00021-stylegan2-all_cars_all_labels_256-2gpu-config-f/network-snapshot-009273.pkl'
-    train.resume_kimg = 9273.7
-
     sched.G_lrate_base = sched.D_lrate_base = 0.002
     sched.minibatch_size_base = 32
     sched.minibatch_gpu_base = 4
@@ -71,6 +66,7 @@ def run(dataset, data_dir, result_dir, config_id, num_gpus, total_kimg, gamma, m
     assert num_gpus in [1, 2, 4, 8]
     sc.num_gpus = num_gpus
     desc += '-%dgpu' % num_gpus
+    desc += '-label-mapping-concat-interpolate'
 
     assert config_id in _valid_configs
     desc += '-' + config_id

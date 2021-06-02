@@ -32,7 +32,7 @@ def slerp(a, b, t):
 #----------------------------------------------------------------------------
 
 class PPL(metric_base.MetricBase):
-    def __init__(self, num_samples, epsilon, space, sampling, crop, minibatch_per_gpu, Gs_overrides, **kwargs):
+    def __init__(self, num_samples, concat, epsilon, space, sampling, crop, minibatch_per_gpu, Gs_overrides, **kwargs):
         assert space in ['z', 'w']
         assert sampling in ['full', 'end']
         super().__init__(**kwargs)
@@ -43,6 +43,7 @@ class PPL(metric_base.MetricBase):
         self.crop = crop
         self.minibatch_per_gpu = minibatch_per_gpu
         self.Gs_overrides = Gs_overrides
+        self.concat = concat
 
     def _evaluate(self, Gs, Gs_kwargs, num_gpus):
         Gs_kwargs = dict(Gs_kwargs)
@@ -61,25 +62,19 @@ class PPL(metric_base.MetricBase):
                 lerp_t = tf.random_uniform([self.minibatch_per_gpu], 0.0, 1.0 if self.sampling == 'full' else 0.0)
                 labels = tf.reshape(tf.tile(self._get_random_labels_tf(self.minibatch_per_gpu), [1, 2]), [self.minibatch_per_gpu * 2, -1])
 
-                # Interpolate in W or Z.
-                if self.space == 'w':
-                    dlat_latent = Gs_clone.components.mapping_latent.get_output_for(lat_t01, **Gs_kwargs)
-                    dlat_label = Gs_clone.components.mapping_label.get_output_for(labels, **Gs_kwargs)
+                # Interpolate in W
+                dlat_latent = Gs_clone.components.mapping_latent.get_output_for(lat_t01, **Gs_kwargs)
+                dlat_label = Gs_clone.components.mapping_label.get_output_for(labels, **Gs_kwargs)
+                if self.concat:
+                    dlat_t01 = tf.concat([dlat_latent, dlat_label], axis=2)
+                else:
                     dlat_t01 = dlat_latent + dlat_label
-                    dlat_t01 = tf.cast(dlat_t01, tf.float32)
-                    dlat_t0, dlat_t1 = dlat_t01[0::2], dlat_t01[1::2]
-                    dlat_e0 = tflib.lerp(dlat_t0, dlat_t1, lerp_t[:, np.newaxis, np.newaxis])
-                    dlat_e1 = tflib.lerp(dlat_t0, dlat_t1, lerp_t[:, np.newaxis, np.newaxis] + self.epsilon)
-                    dlat_e01 = tf.reshape(tf.stack([dlat_e0, dlat_e1], axis=1), dlat_t01.shape)
-                else: # space == 'z'
-                    lat_t0, lat_t1 = lat_t01[0::2], lat_t01[1::2]
-                    lat_e0 = slerp(lat_t0, lat_t1, lerp_t[:, np.newaxis])
-                    lat_e1 = slerp(lat_t0, lat_t1, lerp_t[:, np.newaxis] + self.epsilon)
-                    lat_e01 = tf.reshape(tf.stack([lat_e0, lat_e1], axis=1), lat_t01.shape)
-                    dlat_latent = Gs_clone.components.mapping_latent.get_output_for(lat_t01, **Gs_kwargs)
-                    dlat_label = Gs_clone.components.mapping_latent.get_output_for(labels, **Gs_kwargs)
-                    dlat_t01 = dlat_latent + dlat_label
-                    dlat_t01 = tf.cast(dlat_t01, tf.float32)
+                dlat_t01 = tf.cast(dlat_t01, tf.float32)
+                dlat_t0, dlat_t1 = dlat_t01[0::2], dlat_t01[1::2]
+                dlat_e0 = tflib.lerp(dlat_t0, dlat_t1, lerp_t[:, np.newaxis, np.newaxis])
+                dlat_e1 = tflib.lerp(dlat_t0, dlat_t1, lerp_t[:, np.newaxis, np.newaxis] + self.epsilon)
+                dlat_e01 = tf.reshape(tf.stack([dlat_e0, dlat_e1], axis=1), dlat_t01.shape)
+
 
                 # Synthesize images.
                 with tf.control_dependencies([var.initializer for var in noise_vars]): # use same noise inputs for the entire minibatch

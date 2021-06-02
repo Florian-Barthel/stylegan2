@@ -14,6 +14,7 @@
         //var address = "http://gimpel.informatik.uni-augsburg.de:5000"
 
         window.onload = () => {
+            updateNetworkCheckpoint()
             $('#sendbutton').click(() => {
                 imagebox = $('#imagebox')
                 seed_textbox = $('#seed')
@@ -55,10 +56,26 @@
                         image = bytestring.split('\'')[1]
                         imagebox.attr('src', 'data:image/jpeg;base64,' + image)
                         seed_textbox.val(data['seed'])
+                        updateNetworkCheckpoint()
                     }
-                });
-            });
-        };
+                })
+            })
+        }
+        function updateNetworkCheckpoint() {
+            $.ajax({
+                url: address + "/get_network_checkpoint",
+                type: "POST",
+                contentType: 'application/json',
+                error: function (textStatus, errorThrown) {
+                    console.log("status", textStatus)
+                    console.log("errorThrown", errorThrown)
+                },
+                success: function (data) {
+                    networkCheckpoint_text = $('#networkCheckpoint')
+                    networkCheckpoint_text.text('current network checkpoint: ' + data['network_checkpoint'])
+                }
+            })
+        }
     </script>
 </head>
 <body>
@@ -337,5 +354,6 @@
     <img style="float: left;" id="imagebox" alt="" src="">
 
 </div>
+<p id="networkCheckpoint"></p>
 </body>
 </html>

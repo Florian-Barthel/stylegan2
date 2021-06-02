@@ -532,11 +532,11 @@ def create_celeba(tfrecord_dir, celeba_dir, cx=89, cy=121):
 #----------------------------------------------------------------------------
 
 
-def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir='../modified_datasets/cars_flat_ratio_warnings', shuffle=False, width=512, height=512):
+def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir='../modified_datasets/cars_flat_ratio_warnings', shuffle=False, width=256, height=256):
 
-    label_dir = 'C:/Users/Florian/Desktop/cars/labels_body-80_crop-multiple_update-orientation_update-body_background'
+    label_dir = 'E:/cars/labels_body-80_crop-multiple_update-orientation_update-body_background'
 
-    with open('C:/Users/Florian/Desktop/cars/data.json') as json_file:
+    with open('E:/cars/data.json') as json_file:
         data = json.load(json_file)
     car_models = data['labels'][0]['classes']
     colors = data['labels'][1]['classes']
@@ -552,7 +552,8 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
         if file.lower().endswith(".jpg"):
             num_images += 1
 
-    add_images = False
+    add_images = True
+    add_labels = True
     with TFRecordExporter(tfrecord_dir, num_images) as tfr:
         labels = []
         for file in tqdm(sorted(os.listdir(image_dir))):
@@ -566,45 +567,43 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
                 canvas[:, (width - height) // 2: (width + height) // 2] = img
                 tfr.add_image(img)
 
-            label_file = label_dir + '/' + file + '.json'
-            label_size = 1 + len(car_models) + len(colors) + len(manufacturers) + len(bodies) + len(orientations) + len(ratios) + len(backgrounds)
-            onehot = np.zeros(label_size, dtype=np.float32)
+            if add_labels:
+                label_file = label_dir + '/' + file + '.json'
+                label_size = 1 + len(car_models) + len(colors) + len(manufacturers) + len(bodies) + len(orientations) + len(ratios) + len(backgrounds)
+                onehot = np.zeros(label_size, dtype=np.float32)
+                with open(label_file) as json_file:
+                    car_data = json.load(json_file)
+                onehot[0] = 1.0
+                offset = 1
+                if 'model' in car_data['labels']:
+                    onehot[car_data['labels']['model'] + offset] = 1.0
+                offset += len(car_models)
 
-            with open(label_file) as json_file:
-                car_data = json.load(json_file)
+                if 'color' in car_data['labels']:
+                    onehot[car_data['labels']['color'] + offset] = 1.0
+                offset += len(colors)
 
-            onehot[0] = 1.0
-            offset = 1
+                if 'manufacturer' in car_data['labels']:
+                    onehot[car_data['labels']['manufacturer'] + offset] = 1.0
+                offset += len(manufacturers)
 
-            if 'model' in car_data['labels']:
-                onehot[car_data['labels']['model'] + offset] = 1.0
-            offset += len(car_models)
+                if 'body' in car_data['labels']:
+                    onehot[car_data['labels']['body'] + offset] = 1.0
+                offset += len(bodies)
 
-            if 'color' in car_data['labels']:
-                onehot[car_data['labels']['color'] + offset] = 1.0
-            offset += len(colors)
+                if 'orientation' in car_data['labels']:
+                    onehot[car_data['labels']['orientation'] + offset] = 1.0
+                offset += len(orientations)
 
-            if 'manufacturer' in car_data['labels']:
-                onehot[car_data['labels']['manufacturer'] + offset] = 1.0
-            offset += len(manufacturers)
+                if 'ratio' in car_data['labels']:
+                    onehot[car_data['labels']['ratio'] + offset] = 1.0
+                offset += len(ratios)
 
-            if 'body' in car_data['labels']:
-                onehot[car_data['labels']['body'] + offset] = 1.0
-            offset += len(bodies)
-
-            if 'orientation' in car_data['labels']:
-                onehot[car_data['labels']['orientation'] + offset] = 1.0
-            offset += len(orientations)
-
-            if 'ratio' in car_data['labels']:
-                onehot[car_data['labels']['ratio'] + offset] = 1.0
-            offset += len(ratios)
-
-            if 'background' in car_data['labels']:
-                onehot[car_data['labels']['background'] + offset] = 1.0
-
-            labels.append(onehot)
-        tfr.add_labels(np.asarray(labels))
+                if 'background' in car_data['labels']:
+                    onehot[car_data['labels']['background'] + offset] = 1.0
+                labels.append(onehot)
+        if add_labels:
+            tfr.add_labels(np.asarray(labels))
 
 
 # def create_from_images(tfrecord_dir='./datasets/abstract_art_512', image_dir='E:abstract_art_512', shuffle=False, width=512, height=320):

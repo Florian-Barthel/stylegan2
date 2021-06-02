@@ -13,9 +13,6 @@ CORS(app)
 generator = generate.Generate()
 
 
-# generator.load_network('00093-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-001504.pkl')
-
-
 @app.route('/image', methods=['GET', 'POST'])
 def image():
     data = request.get_json()
@@ -27,7 +24,10 @@ def image():
     if randomize_seed:
         seed = int(np.random.uniform() * (2 ** 32 - 1))
     result = generator.generate_single_image(label, seed, size)
-    return jsonify({'status': result, 'seed': seed})
+    return jsonify({
+        'status': result,
+        'seed': seed
+    })
 
 
 @app.route('/load_3d_view', methods=['POST'])
@@ -40,7 +40,11 @@ def load_3d_view():
         seed = int(np.random.uniform() * (2 ** 32 - 1))
     labels = generate_label.label_vector_rotation(payload)
     result, cache_size = generator.rotations(labels=labels, seed=seed)
-    return jsonify({'status': result, 'cache_size': cache_size, 'seed': seed})
+    return jsonify({
+        'status': result,
+        'cache_size': cache_size,
+        'seed': seed,
+    })
 
 
 @app.route('/load_interpolations', methods=['POST'])
@@ -58,7 +62,10 @@ def load_interpolations():
         label_right=label_right,
         seed_right=seed_right
     )
-    return jsonify({'status': result, 'cache_size': cache_size})
+    return jsonify({
+        'status': result,
+        'cache_size': cache_size,
+    })
 
 
 @app.route('/load_interpolation_graph', methods=['POST'])
@@ -78,7 +85,10 @@ def load_interpolation_graph():
         seed_right=seed_right,
         num_steps=num_steps
     )
-    return jsonify({'graph_image': graph_image, 'linear_diff': linear_diff})
+    return jsonify({
+        'graph_image': graph_image,
+        'linear_diff': linear_diff
+    })
 
 
 @app.route('/get_networks', methods=['GET', 'POST'])
@@ -90,6 +100,10 @@ def get_networks():
                 if file.lower().startswith('network-snapshot'):
                     result.append(run + '/' + file)
     return jsonify({'status': result})
+
+@app.route('/get_network_checkpoint', methods=['GET', 'POST'])
+def get_network_checkpoint():
+    return jsonify({'network_checkpoint': generator.get_current_network_checkpoint()})
 
 
 @app.route('/load_network', methods=['GET', 'POST'])

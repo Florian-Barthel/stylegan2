@@ -19,6 +19,7 @@
         //var address = "http://gimpel.informatik.uni-augsburg.de:5000"
 
         window.onload = () => {
+            updateNetworkCheckpoint()
             $('#sendbutton').click(() => {
                 imagebox = $('#imagebox')
                 seed_textbox = $('#seed')
@@ -61,11 +62,12 @@
                         imagebox.attr('src', 'data:image/jpeg;base64,' + image)
                         seed_textbox.val(data['seed'])
                         loadInterpolations()
+                        updateNetworkCheckpoint()
                     }
                 });
             });
             $('#sendbutton_left').click(() => {
-                imagebox = $('#imagebox_left')
+                imagebox_left = $('#imagebox_left')
                 seed_textbox = $('#seed_left')
                 manufacturer = document.getElementById("manufacturer_left").value
                 model = document.getElementById("model_left").value
@@ -103,14 +105,15 @@
                     success: function (data) {
                         bytestring = data['status']
                         image = bytestring.split('\'')[1]
-                        imagebox.attr('src', 'data:image/jpeg;base64,' + image)
+                        imagebox_left.attr('src', 'data:image/jpeg;base64,' + image)
                         seed_textbox.val(data['seed'])
                         loadInterpolations()
+                        updateNetworkCheckpoint()
                     }
                 })
             })
             $('#generate_graph').click(() => {
-                imagebox = $('#imagebox_graph')
+                imagebox_graph = $('#imagebox_graph')
                 linear_diff_text = $('#linear_diff')
 
                 manufacturer_left = document.getElementById("manufacturer_left").value
@@ -174,21 +177,39 @@
                         bytestring = data['graph_image']
                         linear_diff = data['linear_diff']
                         image = bytestring.split('\'')[1]
-                        imagebox.attr('src', 'data:image/jpeg;base64,' + image)
-                        linear_diff_text.text('Mean normalized difference to linear function: ' + linear_diff)
-
+                        imagebox_graph.attr('src', 'data:image/jpeg;base64,' + image)
+                        linear_diff_text.text('Normalized mean squared  difference to linear function: ' + linear_diff)
+                        updateNetworkCheckpoint()
                     }
                 })
             })
         }
 
         function updateSlider(magnitude) {
-            imagebox = $('#imagebox_interpolate')
+            imagebox_interpolate = $('#imagebox_interpolate')
+            interpolation_mag = $('#interpolation_mag')
             index = parseInt((magnitude / 100) * (global_cache_size - 1))
             image = image_cache[index]
             if (image !== undefined) {
-                imagebox.attr('src', 'data:image/jpeg;base64,' + image_cache[index].split('\'')[1])
+                imagebox_interpolate.attr('src', 'data:image/jpeg;base64,' + image_cache[index].split('\'')[1])
             }
+            interpolation_mag.text((magnitude / 100))
+        }
+
+        function updateNetworkCheckpoint() {
+            $.ajax({
+                url: address + "/get_network_checkpoint",
+                type: "POST",
+                contentType: 'application/json',
+                error: function (textStatus, errorThrown) {
+                    console.log("status", textStatus)
+                    console.log("errorThrown", errorThrown)
+                },
+                success: function (data) {
+                    networkCheckpoint_text = $('#networkCheckpoint')
+                    networkCheckpoint_text.text('current network checkpoint: ' + data['network_checkpoint'])
+                }
+            })
         }
 
         function loadInterpolations() {
@@ -292,10 +313,14 @@
 <table>
     <tr class="main-table">
         <td class="main-table">
-            <table style="float: left">
+            <table class="attribute-table">
                 <tr>
                     <td><h3>Car 1</h3></td>
-                    <td><button type="button" class="btn btn-secondary" style="float: left" name="send" id="sendbutton_left">Generate</button></td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" style="float: left" name="send"
+                                id="sendbutton_left">Generate
+                        </button>
+                    </td>
                 </tr>
                 <tr>
                     <td>Manufacturer</td>
@@ -524,8 +549,9 @@
                     </td>
                     <td>
                         <form>
-                            <label for="randomize_seed"></label>
-                            <input type="checkbox" id="randomize_seed_left" class="randomize_seed" name="randomize_seed"
+                            <label for="randomize_seed_left"></label>
+                            <input type="checkbox" id="randomize_seed_left" class="randomize_seed"
+                                   name="randomize_seed_left"
                                    checked>
                         </form>
                     </td>
@@ -534,10 +560,14 @@
             <img style="float: left;" id="imagebox_left" alt="" src="">
         </td>
         <td class="main-table">
-            <table style="float:left;">
+            <table class="attribute-table">
                 <tr>
                     <td><h3>Car 2 </h3></td>
-                    <td><button type="button" class="btn btn-secondary" style="float: left" name="send" id="sendbutton">Generate</button></td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" style="float: left" name="send" id="sendbutton">
+                            Generate
+                        </button>
+                    </td>
                 </tr>
                 <tr>
                     <td>Manufacturer</td>
@@ -777,13 +807,16 @@
         </td>
     </tr>
     <tr class="main-table">
-
         <td class="main-table"><h3>Interpolation</h3></td>
         <td class="main-table">
             <table>
                 <tr>
                     <td><h3>Derivative Graph</h3></td>
-                    <td style="padding-left: 20px;"><button type="button" class="btn btn-secondary" name="send" style="float: left" id="generate_graph">Generate</button></td>
+                    <td style="padding-left: 20px;">
+                        <button type="button" class="btn btn-secondary" name="send" style="float: left"
+                                id="generate_graph">Generate
+                        </button>
+                    </td>
                 </tr>
             </table>
         </td>
@@ -795,8 +828,7 @@
                    type="range"
                    min="0" max="100" step="1" value="50"
                    oninput="updateSlider(this.value)">
-            <br>
-            <img style="margin-top: 20px" id="imagebox_interpolate" alt="" src="">
+            <p id="interpolation_mag"></p>
         </td>
         <td class="main-table">
             <form>
@@ -805,13 +837,20 @@
                        style="float: left; position: relative; margin-left: 10px; margin-right: 10px; width: 50px;">
 
             </form>
+        </td>
+    </tr>
+    <tr class="main-table">
+        <td class="main-table">
+            <img style="margin-top: 20px" id="imagebox_interpolate" alt="" src="">
+        </td>
+        <td class="main-table">
             <img style="margin-top: 20px" id="imagebox_graph" alt="" src="">
-
             <p id="linear_diff"></p>
         </td>
     </tr>
 </table>
 
 
+<p id="networkCheckpoint"></p>
 </body>
 </html>

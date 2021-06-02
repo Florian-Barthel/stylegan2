@@ -1,14 +1,14 @@
 select {
-    width: 170px;
+    width: 150px;
 }
 
 .box {
-    margin-left:20px;
-    margin-top: 10px;
+    padding-left:20px;
+    padding-top: 10px;
 }
 
 input {
-    width: 170px;
+    width: 150px;
     padding: 0;
     margin: 0;
     position: absolute;
@@ -24,7 +24,7 @@ label {
 }
 
 .attribute {
-    width: 170px;
+    width: 150px;
     padding: 0;
     margin: 0;
     position: absolute;
@@ -37,14 +37,25 @@ label {
 
 td.main-table {
     padding-left:10px;
-    min-width: 655px;
-    padding-top: 20px;
+    min-width: 550px;
+    padding-top: 30px;
+}
+
+.attribute-table {
+    margin-right: 10px;
+    float:left
+}
+
+#networkCheckpoint {
+    position: fixed;
+    bottom: 5px;
+    right: 5px;
 }
 
 .slider {
     -webkit-appearance: none;
-    width: 600px;
-    height: 15px;
+    width: 400px;
+    height: 10px;
     border-radius: 5px;
     background: #d3d3d3;
     outline: none;
@@ -59,15 +70,7 @@ td.main-table {
     width: 25px;
     height: 25px;
     border-radius: 50%;
-    background: #4c79af;
-    cursor: pointer;
-}
-
-.slider::-moz-range-thumb {
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    background: #7bb6fc;
+    background: #878787;
     cursor: pointer;
 }
 

@@ -2,7 +2,13 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 
-colors = ['orange', 'green', 'royalblue', 'red', 'yellow']
+colors = [
+    'orange',
+    'green',
+    'royalblue',
+    'purple',
+    'yellow'
+]
 
 
 def get_data(metric, run_id):
@@ -26,12 +32,35 @@ def get_data(metric, run_id):
     return kimg, score
 
 
-def plot_multiple_runs(run_ids, descriptions, xlabel, ylabel, title, filename, x_min=0, x_max=15, y_min=0, y_max=10,
-                       xticks=3, yticks=1, metric='fid50k'):
+def plot_multiple_runs(
+        run_ids,
+        descriptions,
+        xlabel,
+        ylabel,
+        title,
+        filename,
+        x_min=0,
+        x_max=15,
+        y_min=0,
+        y_max=10,
+        xticks=2,
+        yticks=1,
+        metric='fid50k'):
     fig, ax = plt.subplots()
+    offset = 0
     for run_index in range(len(run_ids)):
         x, y = get_data(metric, run_ids[run_index])
         ax.plot(x, y, colors[run_index], label=descriptions[run_index])
+        xmin = x[np.argmin(y)]
+        ymin = min(y)
+        text = "FID={:.3f}".format(ymin)
+
+        bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.52)
+        arrowprops = dict(arrowstyle="->", connectionstyle="angle,angleA=0,angleB=70")
+        kw = dict(xycoords='data', textcoords="axes fraction", annotation_clip=False,
+                  arrowprops=arrowprops, bbox=bbox_props, color=colors[run_index])
+        ax.annotate(text, xy=(xmin, ymin), xytext=(0.83, 0.4 + offset), **kw)
+        offset += 0.1
     ax.xaxis.set_ticks(np.arange(x_min, x_max, xticks))
     ax.yaxis.set_ticks(np.arange(y_min, y_max, yticks))
     ax.set_xlim(x_min, x_max)
@@ -43,11 +72,20 @@ def plot_multiple_runs(run_ids, descriptions, xlabel, ylabel, title, filename, x
     plt.show()
 
 
-plot_multiple_runs(run_ids=[36, 37, 70],
-                   descriptions=['Without Background Label', 'Single Mapping Network', 'Separate Label Mapping Network'],
-                   xlabel='Million Images seen by the Discriminator',
-                   ylabel='Fréchet Inception Distance',
-                   title='Fréchet Inception Distance over the Training',
-                   filename='fid-label-mapping.png',
-                   y_min=2,
-                   x_max=8)
+plot_multiple_runs(
+    run_ids=[
+        37,
+        70,
+        122
+    ],
+    descriptions=[
+        'Baseline',
+        'Label Mapping Network Add',
+        'Label Mapping Network Concat Interpolate'
+    ],
+    xlabel='Million Images seen by the Discriminator',
+    ylabel='Fréchet Inception Distance',
+    title='Fréchet Inception Distance over the Training',
+    filename='fid-label-mapping-add_vs_concat.png',
+    y_min=2,
+    x_max=8)

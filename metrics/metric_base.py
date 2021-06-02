@@ -5,7 +5,6 @@
 # https://nvlabs.github.io/stylegan2/license.html
 
 """Common definitions for GAN metrics."""
-
 import os
 import time
 import hashlib

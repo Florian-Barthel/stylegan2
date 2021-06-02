@@ -128,12 +128,13 @@ def modulated_conv2d_layer(x, y, fmaps, kernel, up=False, down=False, demodulate
     return x
 
 #----------------------------------------------------------------------------
-# Minibatch standard deviation layer.
+# Minibatch standard deviation layer. Adapted so that the first image of the batch will be ignored
 
 def minibatch_stddev_layer(x, group_size=4, num_new_features=1):
     group_size = tf.minimum(group_size, tf.shape(x)[0])     # Minibatch must be divisible by (or smaller than) group_size.
-    s = x.shape                                             # [NCHW]  Input shape.
-    y = tf.reshape(x, [group_size, -1, num_new_features, s[1]//num_new_features, s[2], s[3]])   # [GMncHW] Split minibatch into M groups of size G. Split channels into n channel groups c.
+    x_remove_first = x[1:]
+    s = x_remove_first.shape                                             # [NCHW]  Input shape.
+    y = tf.reshape(x_remove_first, [group_size - 1, -1, num_new_features, s[1]//num_new_features, s[2], s[3]])   # [GMncHW] Split minibatch into M groups of size G. Split channels into n channel groups c.
     y = tf.cast(y, tf.float32)                              # [GMncHW] Cast to FP32.
     y -= tf.reduce_mean(y, axis=0, keepdims=True)           # [GMncHW] Subtract mean over group.
     y = tf.reduce_mean(tf.square(y), axis=0)                # [MncHW]  Calc variance over group.
@@ -201,11 +202,9 @@ def G_main(
     # Evaluate mapping network.
     dlatents = components.mapping_latent.get_output_for(latents_in, is_training=is_training, **kwargs)
     dlatents = tf.cast(dlatents, tf.float32)
-    autosummary('l2_norm_dlatents', tf.norm(dlatents, ord=2))
 
     dlatents_label = components.mapping_label.get_output_for(labels_in, is_training=is_training, **kwargs)
     dlatents_label = tf.cast(dlatents_label, tf.float32)
-    autosummary('l2_norm_dlatents_label', tf.norm(dlatents_label, ord=2))
 
     dlatents = dlatents + dlatents_label
 
