@@ -12,6 +12,8 @@ import numpy as np
 import PIL.Image
 import PIL.ImageFont
 import dnnlib
+import scipy.stats as st
+
 
 #----------------------------------------------------------------------------
 # Convenience wrappers for pickle that are able to load data produced by
@@ -143,3 +145,14 @@ def setup_snapshot_image_grid(training_set,
     return (gw, gh), reals, labels
 
 #----------------------------------------------------------------------------
+# Random Distributions
+
+class BathtubDistribution(st.rv_continuous):
+    def __init__(self, scale, **kwargs):
+        super(BathtubDistribution, self).__init__(**kwargs)
+        self.scale = scale
+
+    def _pdf(self, x):
+        return (self.scale * (x - 0.5)**4 + 1) / (self.scale / 80 + 1)
+
+# ----------------------------------------------------------------------------
