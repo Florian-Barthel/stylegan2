@@ -215,20 +215,31 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
 def G_logistic_ns_pathreg_interpolate(G, D, opt, training_set, minibatch_size, pl_minibatch_shrink=2, pl_decay=0.01,
                                       pl_weight=2.0):
     _ = opt
-    interpolation_mag = tf.random.uniform([4], minval=0, maxval=1)
+    batch_size = 4
+    interpolation_mag = np.random.uniform(size=[batch_size])
 
     # Interpolate all latents by interpolation_mag
-    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    latents_interpolate = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+    latents = np.random.normal(size=[batch_size] + G.input_shapes[0][1:])
+    latents_interpolate = np.random.normal(size=[batch_size] + G.input_shapes[0][1:])
     dlatents = G.components.mapping_latent.get_output_for(latents, is_training=True)
     dlatents_interpolate = G.components.mapping_latent.get_output_for(latents_interpolate, is_training=True)
-    interpolation_mag_dlatent = tf.expand_dims(tf.expand_dims(interpolation_mag, axis=-1), axis=-1)
+    interpolation_mag_dlatent = np.expand_dims(np.expand_dims(interpolation_mag, axis=-1), axis=-1)
     dlatent_interpolate = dlatents * interpolation_mag_dlatent + dlatents_interpolate * (1 - interpolation_mag_dlatent)
 
     # Interpolate all labels by interpolation_mag
-    labels = training_set.get_random_labels_tf(minibatch_size)
-    labels_interpolate = training_set.get_random_labels_tf(minibatch_size)
-    interpolation_mag_label = tf.expand_dims(interpolation_mag, axis=-1)
+    labels = training_set.get_random_labels_np(batch_size)
+    rotation_offset = 108
+    rotations = labels[:, rotation_offset:rotation_offset + 8]
+    rotation_index = np.argmax(rotations, axis=1)
+    new_rotation_index = ((rotation_index + np.random.choice([-1, 1], size=[batch_size])) % 8)
+    new_rotation = np.zeros([batch_size, 8], dtype=np.uint32)
+    new_rotation[np.arange(batch_size), new_rotation_index] = 1
+    new_rotation = new_rotation * np.expand_dims(
+        np.max(labels[:, rotation_offset:rotation_offset + 8], axis=1).astype(np.uint32), axis=1)
+    labels_interpolate = training_set.get_random_labels_np(batch_size)
+    labels_interpolate[:, rotation_offset:rotation_offset + 8] = new_rotation
+
+    interpolation_mag_label = np.expand_dims(interpolation_mag, axis=-1)
     mixed_label = labels * interpolation_mag_label + labels_interpolate * (1 - interpolation_mag_label)
     dlabel = G.components.mapping_label.get_output_for(mixed_label, is_training=True)
 

@@ -10,6 +10,7 @@ import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
+from  training.misc import BathtubDistribution
 
 
 # ----------------------------------------------------------------------------
@@ -212,23 +213,43 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
 # ----------------------------------------------------------------------------
 
 
-def G_logistic_ns_pathreg_interpolate(G, D, opt, training_set, minibatch_size, pl_minibatch_shrink=2, pl_decay=0.01,
+def G_logistic_ns_pathreg_interpolate(G, D, opt, training_set, minibatch_size, interpolation_mag, pl_minibatch_shrink=2, pl_decay=0.01,
                                       pl_weight=2.0):
     _ = opt
-    interpolation_mag = tf.random.uniform([4], minval=0, maxval=1)
+    batch_size = 4
+    factor = 2
 
+    print(interpolation_mag)
     # Interpolate all latents by interpolation_mag
-    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    latents_interpolate = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+    latents = np.random.normal(size=[batch_size] + G.input_shapes[0][1:])
+    latents_interpolate = np.random.normal(size=[batch_size] + G.input_shapes[0][1:])
     dlatents = G.components.mapping_latent.get_output_for(latents, is_training=True)
     dlatents_interpolate = G.components.mapping_latent.get_output_for(latents_interpolate, is_training=True)
-    interpolation_mag_dlatent = tf.expand_dims(tf.expand_dims(interpolation_mag, axis=-1), axis=-1)
+    interpolation_mag_dlatent = np.expand_dims(np.expand_dims(interpolation_mag, axis=-1), axis=-1)
     dlatent_interpolate = dlatents * interpolation_mag_dlatent + dlatents_interpolate * (1 - interpolation_mag_dlatent)
 
     # Interpolate all labels by interpolation_mag
-    labels = training_set.get_random_labels_tf(minibatch_size)
-    labels_interpolate = training_set.get_random_labels_tf(minibatch_size)
-    interpolation_mag_label = tf.expand_dims(interpolation_mag, axis=-1)
+    labels = training_set.get_random_labels_np(batch_size)
+    rotation_offset = 108
+    num_rotations = 8
+    rotations = labels[:, rotation_offset:rotation_offset + num_rotations]
+    rotation_index = np.argmax(rotations, axis=1)
+    shifted_rotation_index = ((rotation_index + np.random.choice([-1, 1], size=[batch_size])) % 8)
+    num_uniques = 0
+    labels_interpolate = training_set.get_random_labels_np(batch_size * factor)
+    while num_uniques < num_rotations:
+        labels_interpolate = np.concatenate(
+            [labels_interpolate, training_set.get_random_labels_np(batch_size * factor)], axis=0)
+        interpolate_rotations = labels_interpolate[:, rotation_offset:rotation_offset + num_rotations]
+        interpolate_rotation_index = np.argmax(interpolate_rotations, axis=1)
+        uniques, unique_indices = np.unique(interpolate_rotation_index, return_index=True)
+        num_uniques = len(uniques)
+
+    labels_interpolate = labels_interpolate[unique_indices[shifted_rotation_index]]
+    labels_interpolate[:, rotation_offset:rotation_offset + num_rotations] *= np.expand_dims(
+        np.max(rotations, axis=1).astype(np.uint32), axis=1)
+
+    interpolation_mag_label = np.expand_dims(interpolation_mag, axis=-1)
     mixed_label = labels * interpolation_mag_label + labels_interpolate * (1 - interpolation_mag_label)
     dlabel = G.components.mapping_label.get_output_for(mixed_label, is_training=True)
 

@@ -212,12 +212,10 @@ def G_logistic_ns_pathreg(G, D, opt, training_set, minibatch_size, pl_minibatch_
 # ----------------------------------------------------------------------------
 
 
-def G_logistic_ns_pathreg_interpolate(G, D, opt, training_set, minibatch_size, pl_minibatch_shrink=2, pl_decay=0.01,
+def G_logistic_ns_pathreg_interpolate(G, D, opt, training_set, minibatch_size, labels_interpolate, interpolation_mag, pl_minibatch_shrink=2, pl_decay=0.01,
                                       pl_weight=2.0):
     _ = opt
-    interpolation_mag = tf.random.uniform([4], minval=0, maxval=1)
 
-    # Interpolate all latents by interpolation_mag
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     latents_interpolate = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     dlatents = G.components.mapping_latent.get_output_for(latents, is_training=True)
@@ -226,15 +224,11 @@ def G_logistic_ns_pathreg_interpolate(G, D, opt, training_set, minibatch_size, p
     dlatent_interpolate = dlatents * interpolation_mag_dlatent + dlatents_interpolate * (1 - interpolation_mag_dlatent)
 
     # Interpolate all labels by interpolation_mag
-    labels = training_set.get_random_labels_tf(minibatch_size)
-    labels_interpolate = training_set.get_random_labels_tf(minibatch_size)
-    interpolation_mag_label = tf.expand_dims(interpolation_mag, axis=-1)
-    mixed_label = labels * interpolation_mag_label + labels_interpolate * (1 - interpolation_mag_label)
-    dlabel = G.components.mapping_label.get_output_for(mixed_label, is_training=True)
+    dlabel = G.components.mapping_label.get_output_for(labels_interpolate, is_training=True)
 
     fake_dlatents_out = tf.concat([dlatent_interpolate, dlabel], axis=-1)
     fake_images_out = G.components.synthesis.get_output_for(fake_dlatents_out, is_training=True)
-    fake_scores_out = D.get_output_for(fake_images_out, mixed_label, is_training=True)
+    fake_scores_out = D.get_output_for(fake_images_out, labels_interpolate, is_training=True)
     loss = tf.nn.softplus(-fake_scores_out)  # -log(sigmoid(fake_scores_out))
 
     # Path length regularization.

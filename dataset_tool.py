@@ -210,7 +210,14 @@ def display(tfrecord_dir):
             print('Displaying images')
             cv2.namedWindow('dataset_tool')
             print('Press SPACE or ENTER to advance, ESC to exit')
-        print('\nidx = %-8d\nlabel = %s' % (idx, labels[0].tolist()))
+        label_list = labels[0].tolist()
+        rotations = labels[:, 108:108 + 8]
+        rotations_index = (np.argmax(rotations) + np.random.choice([-1, 1])) % 8
+        new_rotation = np.zeros([8])
+        new_rotation[rotations_index] = 1
+        print('\nidx = %-8d\nlabel = %s' % (idx, label_list))
+        print('old rotation', label_list[108:108 + 8])
+        print('new rotation', new_rotation)
         cv2.imshow('dataset_tool', images[0].transpose(1, 2, 0)[:, :, ::-1]) # CHW => HWC, RGB => BGR
         idx += 1
         if cv2.waitKey() == 27:
@@ -552,7 +559,7 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
         if file.lower().endswith(".jpg"):
             num_images += 1
 
-    add_images = True
+    add_images = False
     add_labels = True
     with TFRecordExporter(tfrecord_dir, num_images) as tfr:
         labels = []
@@ -574,6 +581,9 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
                 with open(label_file) as json_file:
                     car_data = json.load(json_file)
                 onehot[0] = 1.0
+                #rotation_order = [0, 1, 3, 6, 5, 7, 4, 2]
+                rotation_order = [0, 1, 7, 2, 6, 4, 3, 5]
+
                 offset = 1
                 if 'model' in car_data['labels']:
                     onehot[car_data['labels']['model'] + offset] = 1.0
@@ -592,7 +602,7 @@ def create_from_images(tfrecord_dir='./datasets/all_cars_all_labels', image_dir=
                 offset += len(bodies)
 
                 if 'orientation' in car_data['labels']:
-                    onehot[car_data['labels']['orientation'] + offset] = 1.0
+                    onehot[rotation_order[car_data['labels']['orientation']] + offset] = 1.0
                 offset += len(orientations)
 
                 if 'ratio' in car_data['labels']:
