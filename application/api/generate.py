@@ -56,11 +56,12 @@ class Generate:
 
         else:
             self.separate_mapping = True
+            print(self.Gs.components.synthesis.input_shape)
             if self.Gs.components.synthesis.input_shape[2] > 512:
                 self.concat = True
-                self.dlatent_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 1024))
-                self.dlatent_left_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 1024))
-                self.dlatent_right_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 1024))
+                self.dlatent_placeholder = tf.placeholder(tf.float32, shape=self.Gs.components.synthesis.input_shape)
+                self.dlatent_left_placeholder = tf.placeholder(tf.float32, shape=self.Gs.components.synthesis.input_shape)
+                self.dlatent_right_placeholder = tf.placeholder(tf.float32, shape=self.Gs.components.synthesis.input_shape)
             else:
                 self.concat = False
             self.dlatent_separate_mapping = self.Gs.components.mapping_latent.get_output_for(self.latent_placeholder)
