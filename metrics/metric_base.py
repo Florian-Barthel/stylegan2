@@ -6,6 +6,7 @@
 
 """Common definitions for GAN metrics."""
 import os
+# os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 import time
 import hashlib
 import numpy as np
@@ -137,6 +138,9 @@ class MetricBase:
 
     def _get_random_labels_tf(self, minibatch_size):
         return self._get_dataset_obj().get_random_labels_tf(minibatch_size)
+
+    def _get_random_labels_np(self, minibatch_size):
+        return self._get_dataset_obj().get_random_labels_np(minibatch_size)
 
 #----------------------------------------------------------------------------
 # Group of multiple metrics.
