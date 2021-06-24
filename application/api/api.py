@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import sys
 import numpy as np
 from flask_cors import CORS
+from classes import classes
 
 sys.path.append("../../")
 import application.api.generate_label as generate_label
@@ -100,6 +101,12 @@ def get_networks():
                 if file.lower().startswith('network-snapshot'):
                     result.append(run + '/' + file)
     return jsonify({'status': result})
+
+
+@app.route('/get_classes', methods=['GET', 'POST'])
+def get_classes():
+    return jsonify(classes)
+
 
 @app.route('/get_network_checkpoint', methods=['GET', 'POST'])
 def get_network_checkpoint():

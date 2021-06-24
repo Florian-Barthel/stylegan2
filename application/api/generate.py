@@ -56,7 +56,6 @@ class Generate:
 
         else:
             self.separate_mapping = True
-            print(self.Gs.components.synthesis.input_shape)
             if self.Gs.components.synthesis.input_shape[2] > 512:
                 self.concat = True
                 self.dlatent_placeholder = tf.placeholder(tf.float32, shape=self.Gs.components.synthesis.input_shape)

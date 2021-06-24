@@ -1,4 +1,4 @@
 /.stylegan2-cache/
 __pycache__/
 /datasets/
-/dnnlib/
+/dnnlib/tflib/

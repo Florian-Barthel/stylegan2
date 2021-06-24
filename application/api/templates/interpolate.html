@@ -9,42 +9,27 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
             integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
             crossorigin="anonymous"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 
     <script>
         var image_cache = []
         var global_cache_size = 0
+
         var address = "http://127.0.0.1:5000"
         //var address = "http://mmc-cuda04.informatik.uni-augsburg.de:5000"
         //var address = "http://gimpel.informatik.uni-augsburg.de:5000"
-
         window.onload = () => {
-            updateNetworkCheckpoint()
-            $('#sendbutton').click(() => {
-                imagebox = $('#imagebox')
-                seed_textbox = $('#seed')
-                manufacturer = document.getElementById("manufacturer").value
-                model = document.getElementById("model").value
-                color = document.getElementById("color").value
-                body = document.getElementById("body").value
-                rotation = document.getElementById("rotation").value
-                ratio = document.getElementById("ratio").value
-                background = document.getElementById("background").value
-                randomize_seed = $('#randomize_seed').is(':checked')
-                seed = document.getElementById("seed").value
-
-                sendData = {
-                    "manufacturer": manufacturer,
-                    "model": model,
-                    "color": color,
-                    "body": body,
-                    "rotation": rotation,
-                    "ratio": ratio,
-                    "background": background,
-                    "randomize_seed": randomize_seed,
-                    "seed": seed,
-                    "size": 256
-                }
+            generate_table_left = $('#generate_table_left')
+            generate_table_right = $('#generate_table_right')
+            send_button_right = buildCarTable(generate_table_left, 'left', true, address)
+            send_button_left = buildCarTable(generate_table_right, 'right', true, address)
+            network_checkpoint_text = $('#networkCheckpoint')
+            updateNetworkCheckpoint(network_checkpoint_text, address)
+            $('#sendbutton_right').click(() => {
+                imagebox = $('#imagebox_right')
+                seed_textbox = $('#Seed_right')
+                sendData = getAttributesFromTable('right', 256)
                 $.ajax({
                     url: address + "/image",
                     type: "POST",
@@ -62,35 +47,14 @@
                         imagebox.attr('src', 'data:image/jpeg;base64,' + image)
                         seed_textbox.val(data['seed'])
                         loadInterpolations()
-                        updateNetworkCheckpoint()
+                        updateNetworkCheckpoint(network_checkpoint_text, address)
                     }
                 });
             });
             $('#sendbutton_left').click(() => {
                 imagebox_left = $('#imagebox_left')
-                seed_textbox = $('#seed_left')
-                manufacturer = document.getElementById("manufacturer_left").value
-                model = document.getElementById("model_left").value
-                color = document.getElementById("color_left").value
-                body = document.getElementById("body_left").value
-                rotation = document.getElementById("rotation_left").value
-                ratio = document.getElementById("ratio_left").value
-                background = document.getElementById("background_left").value
-                randomize_seed = $('#randomize_seed_left').is(':checked')
-                seed = document.getElementById("seed_left").value
-
-                sendData = {
-                    "manufacturer": manufacturer,
-                    "model": model,
-                    "color": color,
-                    "body": body,
-                    "rotation": rotation,
-                    "ratio": ratio,
-                    "background": background,
-                    "randomize_seed": randomize_seed,
-                    "seed": seed,
-                    "size": 256
-                }
+                seed_textbox = $('#Seed_left')
+                sendData = getAttributesFromTable('left', 256)
                 $.ajax({
                     url: address + "/image",
                     type: "POST",
@@ -108,55 +72,16 @@
                         imagebox_left.attr('src', 'data:image/jpeg;base64,' + image)
                         seed_textbox.val(data['seed'])
                         loadInterpolations()
-                        updateNetworkCheckpoint()
+                        updateNetworkCheckpoint(network_checkpoint_text, address)
                     }
                 })
             })
             $('#generate_graph').click(() => {
                 imagebox_graph = $('#imagebox_graph')
                 linear_diff_text = $('#linear_diff')
-
-                manufacturer_left = document.getElementById("manufacturer_left").value
-                model_left = document.getElementById("model_left").value
-                color_left = document.getElementById("color_left").value
-                body_left = document.getElementById("body_left").value
-                rotation_left = document.getElementById("rotation_left").value
-                ratio_left = document.getElementById("ratio_left").value
-                background_left = document.getElementById("background_left").value
-                seed_left = document.getElementById("seed_left").value
-
-                manufacturer_right = document.getElementById("manufacturer").value
-                model_right = document.getElementById("model").value
-                color_right = document.getElementById("color").value
-                body_right = document.getElementById("body").value
-                rotation_right = document.getElementById("rotation").value
-                ratio_right = document.getElementById("ratio").value
-                background_right = document.getElementById("background").value
-                seed_right = document.getElementById("seed").value
-
                 num_steps = document.getElementById('num_steps').value
-
-                payload_right = {
-                    "manufacturer": manufacturer_right,
-                    "model": model_right,
-                    "color": color_right,
-                    "body": body_right,
-                    "rotation": rotation_right,
-                    "ratio": ratio_right,
-                    "background": background_right,
-                    "seed": seed_right
-                }
-
-                payload_left = {
-                    "manufacturer": manufacturer_left,
-                    "model": model_left,
-                    "color": color_left,
-                    "body": body_left,
-                    "rotation": rotation_left,
-                    "ratio": ratio_left,
-                    "background": background_left,
-                    "seed": seed_left
-                }
+                payload_right = getAttributesFromTable('right', 256)
+                payload_left = getAttributesFromTable('left', 256)
 
                 $.ajax({
                     url: address + "/load_interpolation_graph",
@@ -179,7 +104,7 @@
                         image = bytestring.split('\'')[1]
                         imagebox_graph.attr('src', 'data:image/jpeg;base64,' + image)
                         linear_diff_text.text('Normalized mean squared  difference to linear function: ' + linear_diff)
-                        updateNetworkCheckpoint()
+                        updateNetworkCheckpoint(network_checkpoint_text, address)
                     }
                 })
             })
@@ -196,65 +121,10 @@
             interpolation_mag.text((magnitude / 100))
         }
 
-        function updateNetworkCheckpoint() {
-            $.ajax({
-                url: address + "/get_network_checkpoint",
-                type: "POST",
-                contentType: 'application/json',
-                error: function (textStatus, errorThrown) {
-                    console.log("status", textStatus)
-                    console.log("errorThrown", errorThrown)
-                },
-                success: function (data) {
-                    networkCheckpoint_text = $('#networkCheckpoint')
-                    networkCheckpoint_text.text('current network checkpoint: ' + data['network_checkpoint'])
-                }
-            })
-        }
-
         function loadInterpolations() {
             imagebox = $('#imagebox_interpolate')
-
-            manufacturer_left = document.getElementById("manufacturer_left").value
-            model_left = document.getElementById("model_left").value
-            color_left = document.getElementById("color_left").value
-            body_left = document.getElementById("body_left").value
-            rotation_left = document.getElementById("rotation_left").value
-            ratio_left = document.getElementById("ratio_left").value
-            background_left = document.getElementById("background_left").value
-            seed_left = document.getElementById("seed_left").value
-
-            manufacturer_right = document.getElementById("manufacturer").value
-            model_right = document.getElementById("model").value
-            color_right = document.getElementById("color").value
-            body_right = document.getElementById("body").value
-            rotation_right = document.getElementById("rotation").value
-            ratio_right = document.getElementById("ratio").value
-            background_right = document.getElementById("background").value
-            seed_right = document.getElementById("seed").value
-
-            payload_right = {
-                "manufacturer": manufacturer_right,
-                "model": model_right,
-                "color": color_right,
-                "body": body_right,
-                "rotation": rotation_right,
-                "ratio": ratio_right,
-                "background": background_right,
-                "seed": seed_right
-            }
-
-            payload_left = {
-                "manufacturer": manufacturer_left,
-                "model": model_left,
-                "color": color_left,
-                "body": body_left,
-                "rotation": rotation_left,
-                "ratio": ratio_left,
-                "background": background_left,
-                "seed": seed_left
-            }
-
+            payload_right = getAttributesFromTable('right', 256)
+            payload_left = getAttributesFromTable('left', 256)
             $.ajax({
                 url: address + "/load_interpolations",
                 type: "POST",
@@ -273,7 +143,6 @@
                 }
             });
         }
-
 
         function updateCache(bytestring, cache_size) {
             image_cache = bytestring
@@ -310,500 +179,38 @@
         </div>
     </nav>
 </div>
+
 <table>
     <tr class="main-table">
         <td class="main-table">
-            <table class="attribute-table">
+            <table class="attribute-table" id="generate_table_left">
                 <tr>
-                    <td><h3>Car 1</h3></td>
                     <td>
-                        <button type="button" class="btn btn-secondary" style="float: left" name="send"
-                                id="sendbutton_left">Generate
+                        <h3> Car Left</h3>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" style="float: left" id="sendbutton_left">
+                            Generate
                         </button>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Manufacturer</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="manufacturer_left">
-                                    <option value="-1">any</option>
-                                    <option value="0">audi</option>
-                                    <option value="1">bmw</option>
-                                    <option value="2">cadillac</option>
-                                    <option value="3">dacia</option>
-                                    <option value="4">dodge</option>
-                                    <option value="5">ferrari</option>
-                                    <option value="6">fiat</option>
-                                    <option value="7">goggomobil</option>
-                                    <option value="8">honda</option>
-                                    <option value="9">hyundai</option>
-                                    <option value="10">lada</option>
-                                    <option value="11">mazda</option>
-                                    <option value="12">mercedes</option>
-                                    <option value="13">opel</option>
-                                    <option value="14">porsche</option>
-                                    <option value="15">subaru</option>
-                                    <option value="16">tata</option>
-                                    <option value="17">vw</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Model</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="model_left">
-                                    <option value="-1">any</option>
-                                    <option value="0">audi a1</option>
-                                    <option value="1">audi a3</option>
-                                    <option value="2">audi a4</option>
-                                    <option value="3">audi a5</option>
-                                    <option value="4">audi a6</option>
-                                    <option value="5">audi a7</option>
-                                    <option value="6">audi a8</option>
-                                    <option value="7">bmw 1 series</option>
-                                    <option value="8">bmw 2 series</option>
-                                    <option value="9">bmw 3 series</option>
-                                    <option value="10">bmw 4 series</option>
-                                    <option value="11">bmw 5 series</option>
-                                    <option value="12">bmw 6 series</option>
-                                    <option value="13">bmw 7 series</option>
-                                    <option value="14">bmw i3</option>
-                                    <option value="15">bmw i8</option>
-                                    <option value="16">cadillac escalade</option>
-                                    <option value="17">dacia duster</option>
-                                    <option value="18">dacia logan</option>
-                                    <option value="19">dacia sandero</option>
-                                    <option value="20">dodge challenger srt</option>
-                                    <option value="21">dodge charger srt</option>
-                                    <option value="22">dodge ram</option>
-                                    <option value="23">ferrari california</option>
-                                    <option value="24">ferrari enzo</option>
-                                    <option value="25">ferrari la ferrari</option>
-                                    <option value="26">fiat cinquecento</option>
-                                    <option value="27">fiat multipla</option>
-                                    <option value="28">fiat panda</option>
-                                    <option value="29">fiat spider</option>
-                                    <option value="30">goggomobil ts250</option>
-                                    <option value="31">honda civic</option>
-                                    <option value="32">honda jazz</option>
-                                    <option value="33">honda nsx</option>
-                                    <option value="34">hyundai tucson</option>
-                                    <option value="35">lada niva</option>
-                                    <option value="36">mazda 3</option>
-                                    <option value="37">mazda cx5</option>
-                                    <option value="38">mazda miata</option>
-                                    <option value="39">mazda rx8</option>
-                                    <option value="40">mazda5</option>
-                                    <option value="41">mercedes a-class</option>
-                                    <option value="42">mercedes b-class</option>
-                                    <option value="43">mercedes c-class</option>
-                                    <option value="44">mercedes e-class</option>
-                                    <option value="45">mercedes g-class</option>
-                                    <option value="46">mercedes m-class</option>
-                                    <option value="47">mercedes s-class</option>
-                                    <option value="48">mercedes sls amg</option>
-                                    <option value="49">opel adam</option>
-                                    <option value="50">opel admiral</option>
-                                    <option value="51">opel astra</option>
-                                    <option value="52">opel corsa</option>
-                                    <option value="53">opel grandland x</option>
-                                    <option value="54">opel insignia</option>
-                                    <option value="55">opel combo</option>
-                                    <option value="56">porsche 911 gt3</option>
-                                    <option value="57">porsche 944</option>
-                                    <option value="58">porsche cayenne</option>
-                                    <option value="59">porsche panamera</option>
-                                    <option value="60">subaru impreza</option>
-                                    <option value="61">tata nano</option>
-                                    <option value="62">vw golf 7</option>
-                                    <option value="63">vw jetta</option>
-                                    <option value="64">vw passat</option>
-                                    <option value="65">vw tiguan</option>
-                                    <option value="66">vw tuareg</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Color</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="color_left">
-                                    <option value="-1">any</option>
-                                    <option value="0">white</option>
-                                    <option value="1">silver</option>
-                                    <option value="2">gray</option>
-                                    <option value="3">black</option>
-                                    <option value="4">blue</option>
-                                    <option value="5">red</option>
-                                    <option value="6">brown</option>
-                                    <option value="7">green</option>
-                                    <option value="8">yellow</option>
-                                    <option value="9">orange</option>
-                                    <option value="10">purple</option>
-                                    <option value="11">undefined</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Body</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="body_left">
-                                    <option value="-1">any</option>
-                                    <option value="0">Cabrio</option>
-                                    <option value="1">Coupé</option>
-                                    <option value="2">Hatchback</option>
-                                    <option value="3">Limousine</option>
-                                    <option value="4">Off-Road</option>
-                                    <option value="5">Pickup Truck</option>
-                                    <option value="6">Sports Car</option>
-                                    <option value="7">Station Wagon</option>
-                                    <option value="8">SUV</option>
-                                    <option value="9">Van</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Rotation</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="rotation_left">
-                                    <option value="-1">any</option>
-                                    <option value="0">front center</option>
-                                    <option value="1">front left</option>
-                                    <option value="2">front right</option>
-                                    <option value="3">profile left</option>
-                                    <option value="4">profile right</option>
-                                    <option value="5">rear center</option>
-                                    <option value="6">rear left</option>
-                                    <option value="7">rear right</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Background</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="background_left">
-                                    <option value="-1">any</option>
-                                    <option value="0">black</option>
-                                    <option value="1">city</option>
-                                    <option value="2">countryside</option>
-                                    <option value="3">off-road</option>
-                                    <option value="4">showroom</option>
-                                    <option value="5">white</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        Ratio
-                    </td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="ratio_left">
-                                    <option value="0">1.2</option>
-                                    <option value="1" selected="selected">1.4</option>
-                                    <option value="2">1.6</option>
-                                    <option value="3">1.8</option>
-                                    <option value="4">2.0</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Seed
-                    </td>
-                    <td>
-                        <form>
-                            <label for="seed"></label>
-                            <input type="text" class="attribute" id="seed_left" name="seed" value="0">
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Randomize Seed
-
-                    </td>
-                    <td>
-                        <form>
-                            <label for="randomize_seed_left"></label>
-                            <input type="checkbox" id="randomize_seed_left" class="randomize_seed"
-                                   name="randomize_seed_left"
-                                   checked>
-                        </form>
                     </td>
                 </tr>
             </table>
             <img style="float: left;" id="imagebox_left" alt="" src="">
         </td>
         <td class="main-table">
-            <table class="attribute-table">
+            <table class="attribute-table" id="generate_table_right">
                 <tr>
-                    <td><h3>Car 2 </h3></td>
                     <td>
-                        <button type="button" class="btn btn-secondary" style="float: left" name="send" id="sendbutton">
+                        <h3> Car Right</h3>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-secondary" style="float: left" id="sendbutton_right">
                             Generate
                         </button>
                     </td>
                 </tr>
-                <tr>
-                    <td>Manufacturer</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="manufacturer">
-                                    <option value="-1">any</option>
-                                    <option value="0">audi</option>
-                                    <option value="1">bmw</option>
-                                    <option value="2">cadillac</option>
-                                    <option value="3">dacia</option>
-                                    <option value="4">dodge</option>
-                                    <option value="5">ferrari</option>
-                                    <option value="6">fiat</option>
-                                    <option value="7">goggomobil</option>
-                                    <option value="8">honda</option>
-                                    <option value="9">hyundai</option>
-                                    <option value="10">lada</option>
-                                    <option value="11">mazda</option>
-                                    <option value="12">mercedes</option>
-                                    <option value="13">opel</option>
-                                    <option value="14">porsche</option>
-                                    <option value="15">subaru</option>
-                                    <option value="16">tata</option>
-                                    <option value="17">vw</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Model</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="model">
-                                    <option value="-1">any</option>
-                                    <option value="0">audi a1</option>
-                                    <option value="1">audi a3</option>
-                                    <option value="2">audi a4</option>
-                                    <option value="3">audi a5</option>
-                                    <option value="4">audi a6</option>
-                                    <option value="5">audi a7</option>
-                                    <option value="6">audi a8</option>
-                                    <option value="7">bmw 1 series</option>
-                                    <option value="8">bmw 2 series</option>
-                                    <option value="9">bmw 3 series</option>
-                                    <option value="10">bmw 4 series</option>
-                                    <option value="11">bmw 5 series</option>
-                                    <option value="12">bmw 6 series</option>
-                                    <option value="13">bmw 7 series</option>
-                                    <option value="14">bmw i3</option>
-                                    <option value="15">bmw i8</option>
-                                    <option value="16">cadillac escalade</option>
-                                    <option value="17">dacia duster</option>
-                                    <option value="18">dacia logan</option>
-                                    <option value="19">dacia sandero</option>
-                                    <option value="20">dodge challenger srt</option>
-                                    <option value="21">dodge charger srt</option>
-                                    <option value="22">dodge ram</option>
-                                    <option value="23">ferrari california</option>
-                                    <option value="24">ferrari enzo</option>
-                                    <option value="25">ferrari la ferrari</option>
-                                    <option value="26">fiat cinquecento</option>
-                                    <option value="27">fiat multipla</option>
-                                    <option value="28">fiat panda</option>
-                                    <option value="29">fiat spider</option>
-                                    <option value="30">goggomobil ts250</option>
-                                    <option value="31">honda civic</option>
-                                    <option value="32">honda jazz</option>
-                                    <option value="33">honda nsx</option>
-                                    <option value="34">hyundai tucson</option>
-                                    <option value="35">lada niva</option>
-                                    <option value="36">mazda 3</option>
-                                    <option value="37">mazda cx5</option>
-                                    <option value="38">mazda miata</option>
-                                    <option value="39">mazda rx8</option>
-                                    <option value="40">mazda5</option>
-                                    <option value="41">mercedes a-class</option>
-                                    <option value="42">mercedes b-class</option>
-                                    <option value="43">mercedes c-class</option>
-                                    <option value="44">mercedes e-class</option>
-                                    <option value="45">mercedes g-class</option>
-                                    <option value="46">mercedes m-class</option>
-                                    <option value="47">mercedes s-class</option>
-                                    <option value="48">mercedes sls amg</option>
-                                    <option value="49">opel adam</option>
-                                    <option value="50">opel admiral</option>
-                                    <option value="51">opel astra</option>
-                                    <option value="52">opel corsa</option>
-                                    <option value="53">opel grandland x</option>
-                                    <option value="54">opel insignia</option>
-                                    <option value="55">opel combo</option>
-                                    <option value="56">porsche 911 gt3</option>
-                                    <option value="57">porsche 944</option>
-                                    <option value="58">porsche cayenne</option>
-                                    <option value="59">porsche panamera</option>
-                                    <option value="60">subaru impreza</option>
-                                    <option value="61">tata nano</option>
-                                    <option value="62">vw golf 7</option>
-                                    <option value="63">vw jetta</option>
-                                    <option value="64">vw passat</option>
-                                    <option value="65">vw tiguan</option>
-                                    <option value="66">vw tuareg</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Color</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="color">
-                                    <option value="-1">any</option>
-                                    <option value="0">white</option>
-                                    <option value="1">silver</option>
-                                    <option value="2">gray</option>
-                                    <option value="3">black</option>
-                                    <option value="4">blue</option>
-                                    <option value="5">red</option>
-                                    <option value="6">brown</option>
-                                    <option value="7">green</option>
-                                    <option value="8">yellow</option>
-                                    <option value="9">orange</option>
-                                    <option value="10">purple</option>
-                                    <option value="11">undefined</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Body</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="body">
-                                    <option value="-1">any</option>
-                                    <option value="0">Cabrio</option>
-                                    <option value="1">Coupé</option>
-                                    <option value="2">Hatchback</option>
-                                    <option value="3">Limousine</option>
-                                    <option value="4">Off-Road</option>
-                                    <option value="5">Pickup Truck</option>
-                                    <option value="6">Sports Car</option>
-                                    <option value="7">Station Wagon</option>
-                                    <option value="8">SUV</option>
-                                    <option value="9">Van</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Rotation</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="rotation">
-                                    <option value="-1">any</option>
-                                    <option value="0">front center</option>
-                                    <option value="1">front left</option>
-                                    <option value="2">front right</option>
-                                    <option value="3">profile left</option>
-                                    <option value="4">profile right</option>
-                                    <option value="5">rear center</option>
-                                    <option value="6">rear left</option>
-                                    <option value="7">rear right</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Background</td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="background">
-                                    <option value="-1">any</option>
-                                    <option value="0">black</option>
-                                    <option value="1">city</option>
-                                    <option value="2">countryside</option>
-                                    <option value="3">off-road</option>
-                                    <option value="4">showroom</option>
-                                    <option value="5">white</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        Ratio
-                    </td>
-                    <td>
-                        <form>
-                            <label>
-                                <select id="ratio">
-                                    <option value="0">1.2</option>
-                                    <option value="1" selected="selected">1.4</option>
-                                    <option value="2">1.6</option>
-                                    <option value="3">1.8</option>
-                                    <option value="4">2.0</option>
-                                </select>
-                            </label>
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Seed
-                    </td>
-                    <td>
-                        <form>
-                            <label for="seed"></label>
-                            <input class="attribute" type="text" id="seed" name="seed" value="0">
-                        </form>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Randomize Seed
-
-                    </td>
-                    <td>
-                        <form>
-                            <label for="randomize_seed"></label>
-                            <input type="checkbox" id="randomize_seed" class="randomize_seed" name="randomize_seed"
-                                   checked>
-                        </form>
-                    </td>
-                </tr>
             </table>
-            <img style="float: left;" id="imagebox" alt="" src="">
+            <img style="float: left;" id="imagebox_right" alt="" src="">
         </td>
     </tr>
     <tr class="main-table">
@@ -849,8 +256,6 @@
         </td>
     </tr>
 </table>
-
-
 <p id="networkCheckpoint"></p>
 </body>
 </html>
