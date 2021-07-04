@@ -8,6 +8,7 @@ import argparse
 import os
 import sys
 
+import training.misc as misc
 import dnnlib
 import dnnlib.tflib as tflib
 
@@ -25,6 +26,23 @@ def run(network_pkl, metrics, dataset, data_dir, mirror_augment):
     num_gpus = dnnlib.submit_config.num_gpus
     metric_group = metric_base.MetricGroup([metric_defaults[metric] for metric in metrics])
     metric_group.run(network_pkl, data_dir=data_dir, dataset_args=dataset_args, mirror_augment=mirror_augment, num_gpus=num_gpus)
+
+#----------------------------------------------------------------------------
+
+def run_all_snapshots(submit_config, metric_args, run_id):
+    ctx = dnnlib.RunContext(submit_config)
+    tflib.init_tf()
+    print('Evaluating %s metric on all snapshots of run_id %s...' % (metric_args.name, run_id))
+    run_dir = misc.locate_run_dir(run_id)
+    network_pkls = misc.list_network_pkls(run_dir)
+    metric = dnnlib.util.call_func_by_name(**metric_args)
+    print()
+    for idx, network_pkl in enumerate(network_pkls):
+        ctx.update('', idx, len(network_pkls))
+        metric.run(network_pkl, run_dir=run_dir, num_gpus=submit_config.num_gpus)
+    print()
+    ctx.close()
+
 
 #----------------------------------------------------------------------------
 

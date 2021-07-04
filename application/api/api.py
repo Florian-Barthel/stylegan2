@@ -105,7 +105,10 @@ def get_networks():
 
 @app.route('/get_classes', methods=['GET', 'POST'])
 def get_classes():
-    return jsonify(classes)
+    data = {}
+    data['labels'] = classes
+    data['random_label'] = generator.get_real_label()
+    return jsonify(data)
 
 
 @app.route('/get_network_checkpoint', methods=['GET', 'POST'])

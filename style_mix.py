@@ -62,10 +62,10 @@ def generate_images_with_labels(filename, Gs, w, h, num_labels, num_seeds, layer
 
 def main():
     tflib.init_tf()
-    network_pkl = 'results/00014-stylegan2-cars_color_labels-2gpu-config-f/network-snapshot-003068.pkl'
+    network_pkl = 'results/00037-stylegan2-cars_v4_512-2gpu-config-f-baseline/network-snapshot-006316.pkl'
     _G, _D, Gs = misc.load_pkl(network_pkl)
 
-    draw_style_mixing_figure_transition('test_labels/style_mix_0.png', Gs, w=512, h=512, style1_seeds=[12, 2, 13], style2_seed=[116], style_ranges=[list(range(i-2, i)) for i in range(2, 18, 2)])
+    draw_style_mixing_figure_transition('style_mix_0.png', Gs, w=512, h=512, style1_seeds=[12, 2, 13], style2_seed=[116], style_ranges=[list(range(i-2, i)) for i in range(2, 18, 2)])
 
     # generate_images_with_labels('test_labels/colors3.png', Gs, w=512, h=512, num_labels=12, num_seeds=12, layer=4)
 

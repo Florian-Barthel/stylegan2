@@ -1,9 +1,8 @@
 import dnnlib.tflib as tflib
 from training import dataset
 import numpy as np
-import tensorflow as tf
 
-tfrecord_dir = '../datasets/cars_v5_512'
+tfrecord_dir = '../../datasets/cars_v5_512'
 
 tflib.init_tf({'gpu_options.allow_growth': True})
 training_set = dataset.TFRecordDataset(tfrecord_dir, max_label_size='full', repeat=False, shuffle_mb=0)
@@ -11,11 +10,10 @@ tflib.init_uninitialized_vars()
 
 batch_size = 10
 
-interpolation_mag = tf.random.uniform([batch_size], minval=0, maxval=1)
+interpolation_mag = np.random.uniform(size=[batch_size])
 
 labels = training_set.get_random_labels_np(batch_size)
 print('before')
-print(labels)
 rotation_offset = 108
 rotations = labels[:, rotation_offset:rotation_offset + 8]
 rotation_index = np.argmax(rotations, axis=1)
@@ -26,8 +24,10 @@ new_rotation = new_rotation * np.expand_dims(np.max(labels[:, rotation_offset:ro
 labels_interpolate = training_set.get_random_labels_np(batch_size)
 labels_interpolate[:, rotation_offset:rotation_offset + 8] = new_rotation
 
-interpolation_mag_label = tf.expand_dims(interpolation_mag, axis=-1)
+interpolation_mag_label = np.expand_dims(interpolation_mag, axis=-1)
 mixed_label = labels * interpolation_mag_label + labels_interpolate * (1 - interpolation_mag_label)
 
 print('after')
-print(np.round(mixed_label[:, rotation_offset:rotation_offset + 8].eval(), 3))
+print(np.round(labels[:, rotation_offset:rotation_offset + 8], 3))
+print(np.round(labels_interpolate[:, rotation_offset:rotation_offset + 8], 3))
+print(np.round(mixed_label[:, rotation_offset:rotation_offset + 8], 3))

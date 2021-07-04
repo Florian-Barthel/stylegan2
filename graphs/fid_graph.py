@@ -44,7 +44,7 @@ def plot_multiple_runs(
         y_min=0,
         y_max=10,
         xticks=2,
-        yticks=1,
+        yticks=3,
         metric='fid50k'):
     fig, ax = plt.subplots()
     offset = 0
@@ -76,16 +76,17 @@ plot_multiple_runs(
     run_ids=[
         37,
         70,
-        122
+        117
     ],
     descriptions=[
         'Baseline',
-        'Label Mapping Network Add',
-        'Label Mapping Network Concat Interpolate'
+        'Label Mapping Network',
+        'Label Mapping Network Discriminator'
     ],
     xlabel='Million Images seen by the Discriminator',
     ylabel='Fréchet Inception Distance',
     title='Fréchet Inception Distance over the Training',
     filename='fid-label-mapping-add_vs_concat.png',
     y_min=2,
-    x_max=8)
+    y_max=70,
+    x_max=4)

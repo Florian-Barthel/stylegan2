@@ -12,7 +12,7 @@ session = tflib.create_session(None, force_as_default=True)
 latent_placeholder = tf.placeholder(tf.float32, shape=(None, 512))
 dlatent_placeholder = tf.placeholder(tf.float32, shape=(None, 16, 512))
 label_placeholder = tf.placeholder(tf.float32, shape=(None, 127))
-_G, _D, Gs = misc.load_pkl('../results/00070-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-007219.pkl')
+_G, _D, Gs = misc.load_pkl('../../results/00070-stylegan2-cars_v4_512-2gpu-config-f/network-snapshot-007219.pkl')
 
 mapping_latent = Gs.components.mapping_latent.get_output_for(latent_placeholder)
 mapping_label = Gs.components.mapping_label.get_output_for(label_placeholder)

@@ -27,4 +27,5 @@ for scale in scales:
     plt.plot(x, y)
     plt.legend(str(scale))
 
+plt.savefig('bathtub_dist.png')
 plt.show()

@@ -3,7 +3,7 @@ from training import dataset
 import numpy as np
 import tensorflow as tf
 
-tfrecord_dir = '../datasets/cars_v5_512'
+tfrecord_dir = '../../datasets/cars_v5_512'
 
 tflib.init_tf({'gpu_options.allow_growth': True})
 training_set = dataset.TFRecordDataset(tfrecord_dir, max_label_size='full', repeat=False, shuffle_mb=0)

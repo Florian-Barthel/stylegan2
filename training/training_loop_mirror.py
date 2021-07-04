@@ -11,15 +11,11 @@ import tensorflow as tf
 import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
+from generate_images_with_labels import generate_images_with_labels
 
 from training import dataset
 from training import misc
 from metrics import metric_base
-from training.misc import BathtubDistribution
-
-
-
-
 
 #----------------------------------------------------------------------------
 # Just-in-time processing of training images before feeding them to the networks.
@@ -52,45 +48,7 @@ def process_reals(x, labels, lod, mirror_augment, drange_data, drange_net):
         x = tf.reshape(x, [-1, s[1], s[2], 1, s[3], 1])
         x = tf.tile(x, [1, 1, 1, factor, 1, factor])
         x = tf.reshape(x, [-1, s[1], s[2] * factor, s[3] * factor])
-    with tf.name_scope('RandomizeLabels'):
-        keep_probability = 0.80
-        labels_bool = tf.cast(labels, tf.bool)
-        mask = tf.random.uniform(tf.shape(labels), 0.0, 1.0) > (1 - keep_probability)
-        label_remove = tf.cast(tf.math.logical_and(labels_bool, mask), dtype=tf.float32)
-        # multiply_interval = (0.7, 1.3)
-        # random_multiplier = tf.random.uniform(tf.shape(labels), multiply_interval[0], multiply_interval[1])
-        # labels_multiply = label_remove * random_multiplier
-        labels = tf.concat([labels[:, :1], label_remove[:, 1:]], axis=-1)
     return x, labels
-
-
-def interpolate_labels(minibatch_gpu, bathtub, training_set):
-    interpolation_mag = np.float32(bathtub.rvs(size=[minibatch_gpu]))
-    factor = 2
-    labels = training_set.get_random_labels_np(minibatch_gpu)
-    rotation_offset = 108
-    num_rotations = 8
-    rotations = labels[:, rotation_offset:rotation_offset + num_rotations]
-    rotation_index = np.argmax(rotations, axis=1)
-    shifted_rotation_index = ((rotation_index + np.random.choice([-1, 1], size=[minibatch_gpu])) % 8)
-    num_uniques = 0
-    labels_interpolate = training_set.get_random_labels_np(minibatch_gpu * factor)
-    while num_uniques < num_rotations:
-        labels_interpolate = np.concatenate(
-            [labels_interpolate, training_set.get_random_labels_np(minibatch_gpu * factor)], axis=0)
-        interpolate_rotations = labels_interpolate[:, rotation_offset:rotation_offset + num_rotations]
-        interpolate_rotation_index = np.argmax(interpolate_rotations, axis=1)
-        uniques, unique_indices = np.unique(interpolate_rotation_index, return_index=True)
-        num_uniques = len(uniques)
-
-    labels_interpolate = labels_interpolate[unique_indices[shifted_rotation_index]]
-    labels_interpolate[:, rotation_offset:rotation_offset + num_rotations] *= np.expand_dims(
-        np.max(rotations, axis=1).astype(np.uint32), axis=1)
-
-    interpolation_mag_expand = np.expand_dims(interpolation_mag, axis=-1)
-    labels = labels * interpolation_mag_expand + labels_interpolate * (1 - interpolation_mag_expand)
-    return labels, interpolation_mag
-
 
 #----------------------------------------------------------------------------
 # Evaluate time-varying training parameters.
@@ -98,8 +56,6 @@ def interpolate_labels(minibatch_gpu, bathtub, training_set):
 def training_schedule(
     cur_nimg,
     training_set,
-    bathtub_init_scale      = 10000,
-    bathtub_reduce_f10_time = 1000,     # Thousands of real images to reduce the bathtub scale by factor 10
     lod_initial_resolution  = None,     # Image resolution used at the beginning.
     lod_training_kimg       = 600,      # Thousands of real images to show before doubling the resolution.
     lod_transition_kimg     = 600,      # Thousands of real images to show when fading in new layers.
@@ -147,11 +103,6 @@ def training_schedule(
         rampup = min(s.kimg / lrate_rampup_kimg, 1.0)
         s.G_lrate *= rampup
         s.D_lrate *= rampup
-
-    # Bathtub distribution scale
-    bathtub_scale = float(bathtub_init_scale / (10 ** (s.kimg / bathtub_reduce_f10_time)))
-    s.bathtub_scale = bathtub_scale
-    s.bathtub = BathtubDistribution(a=0.0, b=1.0, name='bathtub_dist', scale=bathtub_scale)
 
     # Other parameters.
     s.tick_kimg = tick_kimg_dict.get(s.resolution, tick_kimg_base)
@@ -215,8 +166,8 @@ def training_loop(
 
     # Print layers and generate initial image snapshot.
     G.print_layers(); D.print_layers()
+    sched = training_schedule(cur_nimg=total_kimg*1000, training_set=training_set, **sched_args)
     grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
-
 
     # Setup training inputs.
     print('Building TensorFlow graph...')
@@ -225,8 +176,6 @@ def training_loop(
         lrate_in             = tf.placeholder(tf.float32, name='lrate_in', shape=[])
         minibatch_size_in    = tf.placeholder(tf.int32, name='minibatch_size_in', shape=[])
         minibatch_gpu_in     = tf.placeholder(tf.int32, name='minibatch_gpu_in', shape=[])
-        labels_interpolate_var = tf.placeholder(tf.float32, name='labels_interpolate', shape=[None, 127])
-        interpolation_mag_var = tf.placeholder(tf.float32, name='interpolation_mag', shape=[None])
         minibatch_multiplier = minibatch_size_in // (minibatch_gpu_in * num_gpus)
         Gs_beta              = 0.5 ** tf.div(tf.cast(minibatch_size_in, tf.float32), G_smoothing_kimg * 1000.0) if G_smoothing_kimg > 0.0 else 0.0
 
@@ -275,7 +224,7 @@ def training_loop(
             if 'lod' in D_gpu.vars: lod_assign_ops += [tf.assign(D_gpu.vars['lod'], lod_in)]
             with tf.control_dependencies(lod_assign_ops):
                 with tf.name_scope('G_loss'):
-                    G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set, minibatch_size=minibatch_gpu_in, labels_interpolate=labels_interpolate_var, interpolation_mag=interpolation_mag_var, **G_loss_args)
+                    G_loss, G_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=G_opt, training_set=training_set, minibatch_size=minibatch_gpu_in, **G_loss_args)
                 with tf.name_scope('D_loss'):
                     D_loss, D_reg = dnnlib.util.call_func_by_name(G=G_gpu, D=D_gpu, opt=D_opt, training_set=training_set, minibatch_size=minibatch_gpu_in, reals=reals_read, labels=labels_read, **D_loss_args)
 
@@ -333,18 +282,8 @@ def training_loop(
                 G_opt.reset_optimizer_state(); D_opt.reset_optimizer_state()
         prev_lod = sched.lod
 
-        labels_interpolate, interpolation_mag = interpolate_labels(minibatch_gpu=sched.minibatch_gpu, bathtub=sched.bathtub, training_set=training_set)
-
         # Run training ops.
-        feed_dict = {
-            lod_in: sched.lod,
-            lrate_in: sched.G_lrate,
-            minibatch_size_in: sched.minibatch_size,
-            minibatch_gpu_in: sched.minibatch_gpu,
-            labels_interpolate_var: labels_interpolate,
-            interpolation_mag_var: interpolation_mag
-        }
-
+        feed_dict = {lod_in: sched.lod, lrate_in: sched.G_lrate, minibatch_size_in: sched.minibatch_size, minibatch_gpu_in: sched.minibatch_gpu}
         for _repeat in range(minibatch_repeats):
             rounds = range(0, sched.minibatch_size, sched.minibatch_gpu * num_gpus)
             run_G_reg = (lazy_regularization and running_mb_counter % G_reg_interval == 0)
@@ -398,7 +337,6 @@ def training_loop(
                 autosummary('Resources/peak_gpu_mem_gb', peak_gpu_mem_op.eval() / 2**30)))
             autosummary('Timing/total_hours', total_time / (60.0 * 60.0))
             autosummary('Timing/total_days', total_time / (24.0 * 60.0 * 60.0))
-            autosummary('Progress/bathtub_dist_scale', sched.bathtub_scale)
 
             # Save snapshots.
             if image_snapshot_ticks is not None and (cur_tick % image_snapshot_ticks == 0 or done):

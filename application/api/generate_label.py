@@ -1,11 +1,13 @@
 import numpy as np
+import dnnlib.tflib as tflib
 
+tflib.init_tf()
 
 def label_vector_rotation(payload):
-    rotation_order = [0, 1, 3, 6, 5, 7, 4, 2]
+    # rotation_order = [0, 1, 3, 6, 5, 7, 4, 2]
     label = np.zeros((8, 1, 127), dtype=np.float32)
     for i in range(8):
-        payload['rotation'] = rotation_order[i]
+        payload['rotation'] = i # rotation_order[i]
         label[i] = label_vector(payload)
     return label
 
@@ -42,3 +44,5 @@ def label_vector(payload):
     if background >= 0:
         onehot[0, offset + background] = 1.0
     return onehot
+
+

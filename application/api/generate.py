@@ -8,6 +8,7 @@ from PIL import Image
 import io
 import base64
 import matplotlib.pyplot as plt
+from training import dataset
 
 
 class Generate:
@@ -34,6 +35,11 @@ class Generate:
         self.separate_mapping = None
         self.delta_magnitude_placeholder = None
         self.diff = None
+
+        self.session = tflib.create_session(None, force_as_default=True)
+
+        tfrecord_dir = './../../datasets/cars_v5_512'
+        self.training_set = dataset.TFRecordDataset(tfrecord_dir, max_label_size='full', repeat=False, shuffle_mb=0)
 
         self.current_network_checkpoint = 'No network checkpoint selected'
 
@@ -109,11 +115,18 @@ class Generate:
             self,
             label,
             seed,
-            size):
+            size,
+            convert_to_base64_str=True,
+            return_dlatent=False
+    ):
         dlatent = self._mapping(seed, label)
         output = self.session.run(self.synthesis, feed_dict={self.dlatent_placeholder: dlatent})
         img = self.process_generator_output(output, size)[0]
-        return self.convert_to_base64_str(img)
+        if convert_to_base64_str:
+            img = self.convert_to_base64_str(img)
+        if return_dlatent:
+            return img, dlatent
+        return img
 
     def interpolations(
             self,
@@ -121,7 +134,7 @@ class Generate:
             seed_left,
             label_right,
             seed_right,
-            interpolate_label_in_z=False,
+            interpolate_label_in_z=True,
             size=512,
             cache_size=25):
         interpolation_dlatents = []
@@ -333,7 +346,7 @@ class Generate:
             return dlatent + dlabel
 
     def _mapping(self, seed, label, only_latent=False):
-        latent = np.random.RandomState(seed).normal(0, 1, [1, self.Gs.input_shape[1]]).astype(np.float32)
+        latent = self.get_random_latent(seed)
         if self.separate_mapping:
             dlatent = self.session.run(self.dlatent_separate_mapping, feed_dict={self.latent_placeholder: latent})
             if only_latent:
@@ -378,3 +391,31 @@ class Generate:
         img.save(raw_bytes, "JPEG")
         raw_bytes.seek(0)
         return str(base64.b64encode(raw_bytes.read()))
+
+    def get_random_latent(self, seed=None):
+        if seed is None:
+            return np.random.normal(0, 1, [1, self.Gs.input_shape[1]]).astype(np.float32)
+        else:
+            return np.random.RandomState(seed).normal(0, 1, [1, self.Gs.input_shape[1]]).astype(np.float32)
+
+    def get_real_label(self, as_dict=True):
+        label = self.training_set.get_random_labels_np(1)
+        if not as_dict:
+            return label
+        label = label[0]
+        offset = 1
+        label_dict = {}
+        label_dict['Model'] = int(np.argmax(label[offset:offset + 67]))
+        offset += 67
+        label_dict['Color'] = int(np.argmax(label[offset:offset + 12]))
+        offset += 12
+        label_dict['Manufacturer'] = int(np.argmax(label[offset:offset + 18]))
+        offset += 18
+        label_dict['Body'] = int(np.argmax(label[offset:offset + 10]))
+        offset += 10
+        label_dict['Rotation'] = int(np.argmax(label[offset:offset + 8]))
+        offset += 8
+        label_dict['Ratio'] = int(np.argmax(label[offset:offset + 5]))
+        offset += 5
+        label_dict['Background'] = int(np.argmax(label[offset:offset + 6]))
+        return label_dict
